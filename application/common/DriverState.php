@@ -1,16 +1,15 @@
 <?php
 /**
- * 草药性质
+ * 受伤情况
  */
 
 namespace app\common;
 
-class NoteSide
+class DriverState
 {
 
     static $message = [
-        1 => '内服',
-        2 => '外用'
+        1 => '待核实'
     ];
 
     public static function format ($code)

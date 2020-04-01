@@ -1,19 +1,15 @@
 <?php
 /**
- * 一般状态
+ * 车辆情况
  */
 
 namespace app\common;
 
-class CommonStatus
+class CarState
 {
 
-    const FALSE = 0;
-    const TRUE  = 1;
-
     static $message = [
-        0 => '停用',
-        1 => '启用'
+        1 => '待核实'
     ];
 
     public static function format ($code)

@@ -126,7 +126,7 @@ class Controller {
         $referer->_module = $module;
         $referer->_action = $action;
 
-        if ($action{0} === '_' || !method_exists($className, $action)) {
+        if ($action[0] === '_' || !method_exists($className, $action)) {
             $action = '_notfund';
         }
 
@@ -135,7 +135,7 @@ class Controller {
             $ratelimit = $ratelimit[$action];
             $result = RateLimit::grant($ratelimit['url'] ? $ratelimit['url'] : ($_SERVER['REMOTE_ADDR'] . $module . $action), $ratelimit['rule'], $ratelimit['interval'], $ratelimit['engine']);
             if ($result['errorcode'] !== 0) {
-                json($result['result'], isset($ratelimit['message']) && $ratelimit['message'][$result['errorcode']] ? $ratelimit['message'][$result['errorcode']] : $result['message'], $result['errorcode']);
+                json($result['data'], isset($ratelimit['message']) && $ratelimit['message'][$result['errorcode']] ? $ratelimit['message'][$result['errorcode']] : $result['message'], $result['errorcode']);
             }
         }
         unset($ratelimit);
@@ -156,7 +156,7 @@ class Controller {
         if (null !== $result) {
             if (is_array($result) ) {
                 if (isset($result['errorcode'])) {
-                    json($result['result'], $result['message'], $result['errorcode']);
+                    json($result['data'], $result['message'], $result['errorcode']);
                 }
                 if ($referer->isAjax()) {
                     json($result);
@@ -227,7 +227,7 @@ abstract class ActionPDO {
             exit(0);
         }
         if ($url) {
-            $url = $url{0} === '/' ? (APPLICATION_URL . $url) : $url;
+            $url = $url[0] === '/' ? (APPLICATION_URL . $url) : $url;
         } else {
             if (isset($url)) {
                 $url = !empty($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : APPLICATION_URL;
@@ -516,7 +516,7 @@ class Crud {
         return $this->getDb()->field($field)->where($condition)->order($order)->group($group)->limit($limit)->select();
     }
 
-    protected function count (array $condition, $field = null, $group = null)
+    protected function count (array $condition, $field = null, $order = null, $group = null)
     {
         return $this->getDb()->field($field)->where($condition)->group($group)->count();
     }

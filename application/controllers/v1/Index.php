@@ -14,12 +14,17 @@ class Index extends ActionPDO {
         if (!isset($_SERVER['PHP_AUTH_USER']) ||
             !isset($_SERVER['PHP_AUTH_PW']) ||
             $_SERVER['PHP_AUTH_USER'] != 'admin' ||
-            $_SERVER['PHP_AUTH_PW'] != 'chang_123456') {
+            $_SERVER['PHP_AUTH_PW'] != '12345678') {
             header('HTTP/1.1 401 Unauthorized');
             http_response_code(401);
             header('WWW-Authenticate: Basic realm="Administrator Secret"');
             exit('Administrator Secret!');
         }
+    }
+
+    public function index () 
+    {
+        phpinfo();
     }
 
     public function logger ()

@@ -108,10 +108,10 @@ class JSSDK {
         if ($result['errorcode'] !== 0) {
             return $result;
         }
-        $result = $result['result'];
+        $result = $result['data'];
 
         // 生成authcode
-        $result['type'] = 'wx';
+        $result['type'] = 'mp';
         $result['authcode'] = (isset($result['unionid']) && $result['unionid']) ? $result['unionid'] : $result['openid'];
 
         // 小程序解密类
@@ -162,10 +162,13 @@ class JSSDK {
     public function code2Session ($code)
     {
         try {
-            $reponse = https_request('https://api.weixin.qq.com/sns/jscode2session?appid=' . $this->appId . '&secret=' . $this->appSecret . '&js_code=' . $code . '&grant_type=authorization_code');
+            $reponse = https_request([
+                'url' => 'https://api.weixin.qq.com/sns/jscode2session?appid=' . $this->appId . '&secret=' . $this->appSecret . '&js_code=' . $code . '&grant_type=authorization_code'
+            ]);
         } catch (\Exception $e) {
             return error($e->getMessage());
         }
+        $reponse = $reponse['data'];
         if ($reponse['errcode']) {
             return error($reponse['errmsg']);
         }

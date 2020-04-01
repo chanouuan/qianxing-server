@@ -1,21 +1,19 @@
 <?php
 /**
- * 订单来源
+ * 天气
  */
 
 namespace app\common;
 
-class OrderSource
+class Weather
 {
 
-    const DOCTOR      = 1;
-    const BUY_DRUG    = 2;
-    const APPOINTMENT = 3;
-
     static $message = [
-        1 => '医生处方',
-        2 => '购药',
-        3 => '网上预约'
+        1 => '晴',
+        2 => '阴',
+        3 => '雨',
+        4 => '雪',
+        5 => '雾'
     ];
 
     public static function format ($code)

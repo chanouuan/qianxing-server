@@ -187,7 +187,7 @@ class DbMysql extends Db {
         });
     }
 
-    public function insert (array $fieldlist, $replace = false, $insert_id = false)
+    public function insert (array $fieldlist, $insert_id = false, $replace = false)
     {
         $prepare = $this->_bind_values ? true : false;
         $key     = [];
@@ -356,7 +356,7 @@ class DbMysql extends Db {
     private function getFieldPrototype ($field, $prepare = false)
     {
         if ($prepare) {
-            if ($field == '?' || $field{0} == ':') {
+            if ($field == '?' || $field[0] == ':') {
                 return $field;
             }
         }

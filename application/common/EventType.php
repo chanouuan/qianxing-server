@@ -1,21 +1,18 @@
 <?php
 /**
- * 处方状态
+ * 事件类型
  */
 
 namespace app\common;
 
-class NoteStatus
+class EventType
 {
 
-    const NOPAY  = 0;
-    const PAY    = 1;
-    const REFUND = 2;
-
     static $message = [
-        0 => '未付费',
-        1 => '已付费',
-        2 => '已退费'
+        1 => '公路突发事件',
+        2 => '自然灾害',
+        3 => '交通建设工程安全事故',
+        4 => '社会安全事件'
     ];
 
     public static function format ($code)

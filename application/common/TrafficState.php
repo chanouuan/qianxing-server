@@ -1,19 +1,15 @@
 <?php
 /**
- * 资金流出操作类型
+ * 交通情况
  */
 
 namespace app\common;
 
-class OrderPayFlow
+class TrafficState
 {
 
-    const CHARGE = 1;
-    const REFUND = 2;
-
     static $message = [
-        1 => '收费',
-        2 => '退费'
+        1 => '待核实'
     ];
 
     public static function format ($code)

@@ -3,10 +3,252 @@
 namespace app\models;
 
 use Crud;
+use app\common\Gender;
 
 class UserModel extends Crud {
 
     protected $table = 'pro_user';
+
+    /**
+     * 微信小程序登录
+     * @return array
+     */
+    public function mpLogin (array $post)
+    {
+        $post['authcode'] = trim_space($post['authcode'], 0, 32);
+
+        if (!$post['authcode']) {
+            return error('授权码不能为空');
+        }
+
+        if (false === ($bindingInfo = $this->getDb()
+            ->table('pro_login_binding')
+            ->field('user_id')
+            ->where(['authcode' => $post['authcode']])
+            ->limit(1)
+            ->find())) {
+            return error('查询错误');
+        }
+
+        if ($bindingInfo) {
+            // 已绑定授权码
+            $userId = $bindingInfo['user_id'];
+        } else {
+            // 新注册用户，并绑定授权码
+            if (!$userId = $this->getDb()->transaction(function ($db) use ($post) {
+                if (!$id = $db->insert([
+                    'nick_name' => trim_space($post['nickName'], 0, 30),
+                    'avatar' => $post['avatarUrl'],
+                    'gender' => Gender::format($post['gender']),
+                    'create_time' => date('Y-m-d H:i:s', TIMESTAMP)
+                ], true)) {
+                    return false;
+                }
+                if (!$this->getDb()->table('qianxing_user_count')->insert([
+                    'user_id' => $id
+                ])) {
+                    return false;
+                }
+                if (!$this->getDb()->table('pro_login_binding')->insert([
+                    'user_id' => $id,
+                    'type' => 'mp',
+                    'authcode' => $post['authcode'],
+                    'openid' => $post['openid'],
+                    'create_time' => date('Y-m-d H:i:s', TIMESTAMP)
+                ])) {
+                    return false;
+                }
+                return $id;
+            })) {
+                return error('授权码注册失败');
+            }
+        }
+
+        $userInfo = $this->getUserInfo($userId);
+        if ($userInfo['status'] !== 1) {
+            return error('账号已禁用，请联系管理员。');
+        }
+
+        // 登录用户
+        $result = $this->setloginstatus($userId, uniqid(), ['clienttype' => 'mp']);
+        if ($result['errorcode'] !== 0) {
+            return $result;
+        }
+        $userInfo['token'] = $result['data']['token'];
+        $userInfo['openid'] = $post['openid'];
+
+        return success($userInfo);
+    }
+
+    /**
+     * 修改用户手机
+     * @return array
+     */
+    public function changePhone (int $user_id, array $post)
+    {
+        // 验证手机
+        if (!validate_telephone($post['telephone'])) {
+            return error('手机号为空或格式不正确！');
+        }
+
+        // 验证短信
+        if (isset($post['msgcode'])) {
+            if (!$this->checkSmsCode($post['telephone'], $post['msgcode'])) {
+                return error('验证码错误或已过期！');
+            }
+        }
+
+        // 判断该手机号是否管理员
+        if (false === ($adminInfo = (new AdminModel())->getUserInfo([
+            'telephone' => $post['telephone']
+        ]))) {
+            return error('查询错误');
+        }
+        $updateParams = [
+            'telephone'   => $post['telephone'],
+            'update_time' => date('Y-m-d H:i:s', TIMESTAMP)
+        ];
+        if ($adminInfo) {
+            if ($adminInfo['status'] != 1) {
+                return error('该手机号已禁用，请联系管理员。');
+            }
+            $updateParams = array_filter([
+                'telephone'   => $adminInfo['telephone'],
+                'full_name'   => $adminInfo['full_name'],
+                'avatar'      => $adminInfo['avatar'],
+                'gender'      => $adminInfo['gender'],
+                'group_id'    => $adminInfo['group_id'],
+                'update_time' => date('Y-m-d H:i:s', TIMESTAMP)
+            ]);
+        }
+
+        // 获取报案当事人信息
+        $reportModel = new ReportModel();
+        if ($reportInfo = $reportModel->getDerelictCase($post['telephone'])) {
+            $updateParams = array_merge($updateParams, $reportInfo);
+        }
+
+        // 获取该手机号已注册的用户
+        if (false === ($userInfo = $this->getUserInfo([
+            'telephone' => $post['telephone'],
+            'id' => ['<>', $user_id]
+        ], 'id'))) {
+            return error('查询错误');
+        }
+
+        if (!$userInfo) {
+            // 手机号未注册过
+            if (!$this->getDb()->where(['id' => $user_id])->update($updateParams)) {
+                return error('手机号更新失败');
+            }
+        } else {
+            // 手机号已被注册
+            if (!$this->getDb()->transaction(function ($db) use ($post, $userInfo, $user_id, $updateParams) {
+                // 更新占号用户手机号
+                if (!$db->where(['id' => $userInfo['id']])->update([
+                    'telephone' => null,
+                    'group_id' => 0,
+                    'description' => '解绑手机号' . $post['telephone'] . '到用户' . $user_id, 
+                    'update_time' => date('Y-m-d H:i:s', TIMESTAMP)
+                ])) {
+                    return false;
+                }
+                // 更新当前用户手机号
+                if (!$db->where(['id' => $user_id])->update($updateParams)) {
+                    return false;
+                }
+                return true;
+            })) {
+                return error('手机号解绑失败');
+            }
+        }
+
+        // 关联报案当事人
+        $reportModel->relationCase($user_id, $post['telephone']);
+
+        return success(['telephone' => $post['telephone']]);
+    }
+
+    /**
+     * 更新用户信息
+     * @return array
+     */
+    public function updateUserInfo ($user_id, array $data)
+    {
+        return $this->getDb()->where(is_array($user_id) ? $user_id : ['id' => $user_id])->update($data);
+    }
+
+    /**
+     * 获取用户信息
+     * @return array
+     */
+    public function getUserInfo ($user_id, $field = null)
+    {
+        if (!$user_id) {
+            return [];
+        }
+        $field = $field ? $field : 'id,avatar,nick_name,full_name,idcard,telephone,group_id,status';
+        if (!$userInfo = $this->find(is_array($user_id) ? $user_id : ['id' => $user_id], $field)) {
+            return [];
+        }
+        if (isset($userInfo['avatar'])) {
+            $userInfo['avatar'] = httpurl($userInfo['avatar']);
+        }
+        if (isset($userInfo['nick_name'])) {
+            $userInfo['nick_name'] = get_real_val($userInfo['full_name'], $userInfo['nick_name'], $userInfo['telephone']);
+        }
+        // 部门
+        if ($userInfo['group_id']) {
+            $groupInfo = (new GroupModel())->find(['id' => $userInfo['group_id']], 'name');
+            $userInfo['group_name'] = $groupInfo['name'];
+        }
+        return $userInfo;
+    }
+
+    /**
+     * 检查用户信息
+     * @param $user_id
+     * @return array
+     */
+    public function checkUserInfo (int $user_id)
+    {
+        if (!$userInfo = $this->find(['id' => $user_id], 'id,telephone,group_id,status')) {
+            json(null, '用户不存在', -1);
+        }
+        if ($userInfo['status'] != 1) {
+            json(null, '你已被禁用', -1);
+        }
+        return $userInfo;
+    }
+
+    /**
+     * 获取同事
+     * @return array
+     */
+    public function getColleague (int $user_id)
+    {
+        $userInfo = $this->checkUserInfo($user_id);
+        return success($this->select(['group_id' => $userInfo['group_id'], 'id' => ['<>', $user_id], 'status' => 1], 'id,full_name as name'));
+    }
+
+    /**
+     * 获取用户姓名
+     * @return array
+     */
+    public function getUserNames (array $id)
+    {
+        $id = array_filter(array_unique($id));
+        if (!$id) {
+            return [];
+        }
+        if (!$userList = $this->select(['id' => ['in', $id]], 'id,nick_name,full_name,telephone')) {
+            return [];
+        }
+        foreach ($userList as $k => $v) {
+            $userList[$k]['nick_name'] = get_real_val($v['full_name'], $v['nick_name'], $v['telephone']);
+        }
+        return array_column($userList, 'nickname', 'id');
+    }
 
     /**
      * 登录状态设置
@@ -187,7 +429,7 @@ class UserModel extends Crud {
             $resultSms = [
                 'tel' => $post['telephone']
             ];
-            if (!$resultSms['id'] = $this->getDb()->table('__tablepre__smscode')->insert(['tel' => $post['telephone']], null, true)) {
+            if (!$resultSms['id'] = $this->getDb()->table('__tablepre__smscode')->insert(['tel' => $post['telephone']], true)) {
                 return error('发送失败');
             }
         }

@@ -23,11 +23,6 @@ function get_diff_time ($start_time, $end_time, array $modify = null)
 	return implode('', $str);
 }
 
-function mb_str_split ($str)
-{
-    return empty($str) ? [] : preg_split('/(?<!^)(?!$)/u', $str);
-}
-
 function var_exists ($obj, $var, $default = '')
 {
     return isset($obj[$var]) ? $obj[$var] : $default;
@@ -60,6 +55,9 @@ function byte_convert ($byte)
 
 function round_dollar ($fen, $suffix = false)
 {
+    if (!$fen) {
+        return 0;
+    }
     $fen /= 100;
     return $suffix ? sprintf("%01.2f", $fen) : round($fen, 2);
 }
@@ -641,7 +639,7 @@ function success ($data, $message = '', $errorcode = 0)
     $result = [
         'errorcode' => $errorcode,
         'message'   => $message,
-        'result'    => is_array($data) ? $data : []
+        'data'    => is_array($data) ? $data : []
     ];
     if (isset($_POST['statuscode'])) {
         $result['statuscode'] = $_POST['statuscode'];
@@ -657,7 +655,7 @@ function error ($data, $message = '', $errorcode = -1)
     $result = [
         'errorcode' => $errorcode,
         'message'   => $message,
-        'result'    =>  is_array($data) ? $data : []
+        'data'    =>  is_array($data) ? $data : []
     ];
     if (isset($_POST['statuscode'])) {
         $result['statuscode'] = $_POST['statuscode'];
@@ -722,7 +720,7 @@ function uploadfile ($upfile, $allow_type = 'jpg,jpeg,gif,png,bmp', $width = 80,
     } elseif (false !== strpos('3gp,3g2,avi,mp4,mpeg,mov,tts,asx,wm,wmv,wmx,wvx,flv,mkv,rm,asf', $file_exe)) {
         $file_type = 3;
     }
-    $file_name = date('Ymd', TIMESTAMP) . (rand() % 10) . (rand() % 10) . (rand() % 10) . (rand() % 10) . (rand() % 10) . (rand() % 10) . (rand() % 10) . (rand() % 10) . '.' . $file_exe;
+    $file_name = uniqid() . '.' . $file_exe;
     $file_path = date('Ym', TIMESTAMP);
     $url = $file_path . DIRECTORY_SEPARATOR . $file_name;
     mkdirm($upload_path . DIRECTORY_SEPARATOR . $file_path);

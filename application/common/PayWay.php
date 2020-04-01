@@ -1,23 +1,19 @@
 <?php
 /**
- * 订单状态
+ * 支付方式
  */
 
 namespace app\common;
 
-class OrderStatus
+class PayWay
 {
 
-    const NOPAY       = 0;
-    const PAY         = 1;
-    const PART_REFUND = 2;
-    const FULL_REFUND = 3;
+    const WXPAYJS  = 'wxpayjs';
+    const ALIPAYJS = 'alipayjs';
 
     static $message = [
-        0 => '未收费',
-        1 => '已收费',
-        2 => '部分退费',
-        3 => '全退费',
+        'wxpayjs'  => '微信',
+        'alipayjs' => '支付宝'
     ];
 
     public static function format ($code)
