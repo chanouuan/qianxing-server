@@ -33,6 +33,89 @@ class ReportModel extends Crud {
     }
 
     /**
+     * 保存勘验笔录
+     * @return array
+     */
+    public function reportItem (array $post)
+    {
+        $post['report_id'] = intval($post['report_id']);
+        $post['items'] = $post['items'] ? array_slice(json_decode(htmlspecialchars_decode($post['items']), true), 0, 100) : [];
+        $post['involved_action'] = $post['involved_action'] ? array_slice(json_decode(htmlspecialchars_decode($post['involved_action']), true), 0, 10) : [];
+        $post['involved_action_type'] = $post['involved_action_type'] ? array_slice(json_decode(htmlspecialchars_decode($post['involved_action_type']), true), 0, 3) : [];
+        $post['involved_build_project'] = trim_space($post['involved_build_project'], 0, 200);
+        $post['involved_act'] = trim_space($post['involved_act'], 0, 200);
+        $post['extra_info'] = trim_space($post['extra_info'], 0, 200);
+
+        if (!$reportInfo = $this->find(['id' => $post['report_id'], 'law_id' => $this->userInfo['id'], 'status' => ReportStatus::ACCEPT], 'id')) {
+            return error('案件未找到');
+        }
+
+        // 检查赔付清单
+        foreach ($post['items'] as $k => $v) {
+            $post['items'][$k]['property_id'] = intval($v['property_id']);
+            $post['items'][$k]['price'] = intval(floatval($v['price']) * 100); // 转成分
+            $post['items'][$k]['amount'] = intval($v['amount']);
+            if (!$post['items'][$k]['property_id'] || $post['items'][$k]['price'] < 0 || $post['items'][$k]['amount'] <= 0) {
+                unset($post['items'][$k]);
+            }
+        }
+
+        $items = [];
+        if ($post['items']) {
+            if (!$properties = (new PropertyModel())->getProperties(['id' => ['in', array_column($post['items'], 'property_id')]])) {
+                return error('获取路产项目失败');
+            }
+            $properties = array_column($properties, null, 'id');
+            foreach ($post['items'] as $k => $v) {
+                if (isset($properties[$v['property_id']])) {
+                    $items[] = [
+                        'report_id' => $post['report_id'],
+                        'property_id' => $v['property_id'],
+                        'category' => $properties[$v['property_id']]['category'],
+                        'name' => $properties[$v['property_id']]['name'],
+                        'unit' => $properties[$v['property_id']]['unit'],
+                        'price' => $v['price'],
+                        'amount' => $v['amount'],
+                        'total_money' => $v['price'] * $v['amount']
+                    ];
+                }
+            }
+        }
+
+        if (!$this->getDb()->transaction(function ($db) use ($post, $items) {
+            if (!$this->getDb()->where(['id' => $post['report_id'], 'status' => ReportStatus::ACCEPT])->update([
+                'pay' => array_sum(array_column($items, 'total_money')), // 更新赔付金额
+                'update_time' => date('Y-m-d H:i:s', TIMESTAMP)
+            ])) {
+                return false;
+            }
+            if (false === $this->getDb()->table('qianxing_report_info')->where(['id' => $post['report_id']])->update([
+                'involved_action' => json_encode($post['involved_action']),
+                'involved_action_type' => json_encode($post['involved_action_type']),
+                'involved_build_project' => $post['involved_build_project'],
+                'involved_act' => $post['involved_act'],
+                'extra_info' => $post['extra_info']
+            ])) {
+                return false;
+            }
+            // 更新赔付清单
+            if (false === $this->getDb()->table('qianxing_report_item')->where(['report_id' => $post['report_id']])->delete()) {
+                return false;
+            }
+            if ($items) {
+                if (!$this->getDb()->table('qianxing_report_item')->insert($items)) {
+                    return false;
+                }
+            }
+            return true;
+        })) {
+            return error('保持数据失败');
+        }
+
+        return success('ok');
+    }
+
+    /**
      * 获取未关联当事人的案件信息
      * @return array
      */
@@ -217,26 +300,63 @@ class ReportModel extends Crud {
             return error('案件未找到');
         }
 
+        $reportInfo['pay'] = round_dollar($reportInfo['pay']);
+
+        $fields = null;
         if ($post['data_type'] == 'info') {
-            $reportInfo += $this->getDb()->table('qianxing_report_info')->where(['id' => $post['report_id']])->limit(1)->find();
-            $reportInfo['idcard_front']           = httpurl($reportInfo['idcard_front']);
-            $reportInfo['idcard_behind']          = httpurl($reportInfo['idcard_behind']);
-            $reportInfo['driver_license_front']   = httpurl($reportInfo['driver_license_front']);
-            $reportInfo['driver_license_behind']  = httpurl($reportInfo['driver_license_behind']);
-            $reportInfo['driving_license_front']  = httpurl($reportInfo['driving_license_front']);
+            // 报送信息
+            $fields = 'event_time,weather,car_type,event_type,driver_state,car_state,traffic_state';
+        } else if ($post['data_type'] == 'card') {
+            // 当事人信息
+            $fields = 'addr,full_name,idcard,gender,birthday,plate_num';
+        }
+
+        $reportInfo += $this->getDb()->field($fields)->table('qianxing_report_info')->where(['id' => $post['report_id']])->limit(1)->find();
+
+        if ($post['data_type'] == 'all') {
+            // 路产受损赔付清单
+            $reportInfo['items'] = $this->getDb()->field('property_id,name,unit,price,amount,total_money')->table('qianxing_report_item')->where(['report_id' => $post['report_id']])->select();
+            foreach ($reportInfo['items'] as $k => $v) {
+                $reportInfo['items'][$k]['price'] = round_dollar($v['price']);
+                $reportInfo['items'][$k]['total_money'] = round_dollar($v['total_money']);
+            }
+        }
+
+        if (isset($reportInfo['idcard_front'])) {
+            $reportInfo['idcard_front'] = httpurl($reportInfo['idcard_front']);
+        }
+        if (isset($reportInfo['idcard_behind'])) {
+            $reportInfo['idcard_behind'] = httpurl($reportInfo['idcard_behind']);
+        }
+        if (isset($reportInfo['driver_license_front'])) {
+            $reportInfo['driver_license_front'] = httpurl($reportInfo['driver_license_front']);
+        }
+        if (isset($reportInfo['driver_license_behind'])) {
+            $reportInfo['driver_license_behind'] = httpurl($reportInfo['driver_license_behind']);
+        }
+        if (isset($reportInfo['driving_license_front'])) {
+            $reportInfo['driving_license_front'] = httpurl($reportInfo['driving_license_front']);
+        }
+        if (isset($reportInfo['driving_license_behind'])) {
             $reportInfo['driving_license_behind'] = httpurl($reportInfo['driving_license_behind']);
-            if ($reportInfo['site_photos']) {
-                $reportInfo['site_photos'] = json_decode($reportInfo['site_photos'], true);
-                foreach ($reportInfo['site_photos'] as $k => $v) {
-                    $reportInfo['site_photos'][$k]['src'] = httpurl($v['src']);
-                }
+        }
+        if ($reportInfo['site_photos']) {
+            $reportInfo['site_photos'] = json_decode($reportInfo['site_photos'], true);
+            foreach ($reportInfo['site_photos'] as $k => $v) {
+                $reportInfo['site_photos'][$k]['src'] = httpurl($v['src']);
             }
-            if ($reportInfo['extra_photos']) {
-                $reportInfo['extra_photos'] = json_decode($reportInfo['extra_photos'], true);
-                foreach ($reportInfo['extra_photos'] as $k => $v) {
-                    $reportInfo['extra_photos'][$k]['src'] = httpurl($v['src']);
-                }
+        }
+        if ($reportInfo['extra_photos']) {
+            $reportInfo['extra_photos'] = json_decode($reportInfo['extra_photos'], true);
+            foreach ($reportInfo['extra_photos'] as $k => $v) {
+                $reportInfo['extra_photos'][$k]['src'] = httpurl($v['src']);
             }
+        }
+        if (isset($reportInfo['involved_action'])) {
+            $reportInfo['involved_action'] = $reportInfo['involved_action'] ? json_decode($reportInfo['involved_action'], true) : [];
+        }
+        if (isset($reportInfo['involved_action_type'])) {
+            $reportInfo['involved_action_type'] = $reportInfo['involved_action_type'] ? json_decode($reportInfo['involved_action_type'], true) : [];
         }
 
         return success($reportInfo);

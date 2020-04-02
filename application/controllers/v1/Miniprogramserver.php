@@ -6,6 +6,7 @@ use ActionPDO;
 use app\models\UserModel;
 use app\models\ReportModel;
 use app\models\UserReportModel;
+use app\models\PropertyModel;
 
 /**
  * 小程序服务端接口
@@ -27,7 +28,9 @@ class Miniprogramserver extends ActionPDO {
             'getReportDetail'     => ['interval' => 200],
             'reportInfo'          => ['interval' => 1000],
             'reloadReport'        => ['interval' => 1000],
-            'cardInfo'            => ['interval' => 1000]
+            'cardInfo'            => ['interval' => 1000],
+            'searchPropertyItems' => ['interval' => 200],
+            'reportItem'          => ['interval' => 1000]
         ];
     }
 
@@ -289,6 +292,35 @@ class Miniprogramserver extends ActionPDO {
     public function cardInfo ()
     {
         return (new ReportModel($this->_G['user']['user_id']))->cardInfo($_POST);
+    }
+
+    /**
+     * 搜索路产赔损项目
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":[]
+     * }
+     */
+    public function searchPropertyItems ()
+    {
+        return (new PropertyModel())->search($_POST);
+    }
+
+    /**
+     * 保存勘验笔录
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":[]
+     * }
+     */
+    public function reportItem ()
+    {
+        return (new ReportModel($this->_G['user']['user_id']))->reportItem($_POST);
     }
 
 }
