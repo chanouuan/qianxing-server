@@ -427,96 +427,96 @@ class Crud {
         return \app\library\DB::getInstance($link ? $link : $this->link)->table($this->table)->partition($partition ? $partition : ($partition === false ? null : $this->partition));
     }
 
-    public function __set ($name, $value)
-    {
-        if($name === $this->pk) {
-            $this->variables[$this->pk] = $value;
-        } else {
-            if (empty($this->fields) || in_array($name, $this->fields)) {
-                $this->variables[$name] = $value;
-            }
-        }
-    }
+    // public function __set ($name, $value)
+    // {
+    //     if($name === $this->pk) {
+    //         $this->variables[$this->pk] = $value;
+    //     } else {
+    //         if (empty($this->fields) || in_array($name, $this->fields)) {
+    //             $this->variables[$name] = $value;
+    //         }
+    //     }
+    // }
 
-    public function __get ($name)
-    {
-        if(is_array($this->variables)) {
-            if(array_key_exists($name, $this->variables)) {
-                return $this->variables[$name];
-            }
-        }
-        $trace = debug_backtrace();
-        trigger_error(
-            'Undefined property via __get(): ' . $name .
-            ' in ' . $trace[0]['file'] .
-            ' on line ' . $trace[0]['line'],
-            E_USER_NOTICE);
-        return null;
-    }
+    // public function __get ($name)
+    // {
+    //     if(is_array($this->variables)) {
+    //         if(array_key_exists($name, $this->variables)) {
+    //             return $this->variables[$name];
+    //         }
+    //     }
+    //     $trace = debug_backtrace();
+    //     trigger_error(
+    //         'Undefined property via __get(): ' . $name .
+    //         ' in ' . $trace[0]['file'] .
+    //         ' on line ' . $trace[0]['line'],
+    //         E_USER_NOTICE);
+    //     return null;
+    // }
 
-    protected function save ($id = 0)
-    {
-        $this->variables[$this->pk] = $id ? $id : $this->variables[$this->pk];
+    // protected function save ($id = 0)
+    // {
+    //     $this->variables[$this->pk] = $id ? $id : $this->variables[$this->pk];
 
-        $fieldsvals = [];
-        foreach($this->variables as $k => $v) {
-            if($k !== $this->pk) {
-                $fieldsvals[$k] = ':' . $k;
-            }
-        }
+    //     $fieldsvals = [];
+    //     foreach($this->variables as $k => $v) {
+    //         if($k !== $this->pk) {
+    //             $fieldsvals[$k] = ':' . $k;
+    //         }
+    //     }
 
-        if($fieldsvals) {
-            return $this->getDb()->where([$this->pk => $id])->bindValue($this->variables)->update($fieldsvals);
-        }
-        return null;
-    }
+    //     if($fieldsvals) {
+    //         return $this->getDb()->where([$this->pk => $id])->bindValue($this->variables)->update($fieldsvals);
+    //     }
+    //     return null;
+    // }
 
-    protected function create ()
-    {
-        $fieldsvals = [];
-        foreach($this->variables as $k => $v) {
-            if($k !== $this->pk) {
-                $fieldsvals[$k] = ':' . $k;
-            }
-        }
+    // protected function create ()
+    // {
+    //     $fieldsvals = [];
+    //     foreach($this->variables as $k => $v) {
+    //         if($k !== $this->pk) {
+    //             $fieldsvals[$k] = ':' . $k;
+    //         }
+    //     }
 
-        if($fieldsvals) {
-            return $this->getDb()->bindValue($this->variables)->insert($fieldsvals);
-        }
-        return null;
-    }
+    //     if($fieldsvals) {
+    //         return $this->getDb()->bindValue($this->variables)->insert($fieldsvals);
+    //     }
+    //     return null;
+    // }
 
-    protected function delete ($id = 0)
-    {
-        $id = (empty($this->variables[$this->pk])) ? $id : $this->variables[$this->pk];
+    // protected function delete ($id = 0)
+    // {
+    //     $id = (empty($this->variables[$this->pk])) ? $id : $this->variables[$this->pk];
 
-        if(!empty($id)) {
-            return $this->getDb()->where([$this->pk => $id])->delete();
-        }
-        return null;
-    }
+    //     if(!empty($id)) {
+    //         return $this->getDb()->where([$this->pk => $id])->delete();
+    //     }
+    //     return null;
+    // }
 
-    protected function get ($id = 0)
-    {
-        $id = $id ? $id : $this->variables[$this->pk];
+    // protected function get ($id = 0)
+    // {
+    //     $id = $id ? $id : $this->variables[$this->pk];
 
-        if(!empty($id)) {
-            $this->variables = $this->getDb()->where([$this->pk => $id])->find();
-        }
-        return $this->variables;
-    }
+    //     if(!empty($id)) {
+    //         $this->variables = $this->getDb()->where([$this->pk => $id])->find();
+    //     }
+    //     return $this->variables;
+    // }
 
-    protected function find (array $condition, $field = null, $order = null)
+    public function find (array $condition, $field = null, $order = null)
     {
         return $this->getDb()->field($field)->where($condition)->order($order)->limit(1)->find();
     }
 
-    protected function select (array $condition, $field = null, $order = null, $limit = null, $group = null)
+    public function select (array $condition, $field = null, $order = null, $limit = null, $group = null)
     {
         return $this->getDb()->field($field)->where($condition)->order($order)->group($group)->limit($limit)->select();
     }
 
-    protected function count (array $condition, $field = null, $order = null, $group = null)
+    public function count (array $condition, $field = null, $order = null, $group = null)
     {
         return $this->getDb()->field($field)->where($condition)->group($group)->count();
     }

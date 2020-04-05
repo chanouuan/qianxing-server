@@ -31,7 +31,7 @@ class ReportStatus
 
     public static function getMessage ($code)
     {
-        return isset(self::$message[$code]) ? self::$message[$code] : $code;
+        return isset(self::$message[$code]) ? self::$message[$code] : strval($code);
     }
 
 }

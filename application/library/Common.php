@@ -697,7 +697,7 @@ function json_mysql_encode ($data)
     return $data;
 }
 
-function uploadfile ($upfile, $allow_type = 'jpg,jpeg,gif,png,bmp', $width = 80, $height = 0)
+function uploadfile ($upfile, $allow_type = 'jpg,jpeg,gif,png,bmp', $width = 80, $height = 0, $rotate = 0)
 {
     $upload_path = APPLICATION_PATH . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'upload';
     if (!$file_exe = strtolower(substr(strrchr($upfile['name'], '.'), 1))) {
@@ -731,6 +731,11 @@ function uploadfile ($upfile, $allow_type = 'jpg,jpeg,gif,png,bmp', $width = 80,
     } else {
         rename($upfile['tmp_name'], $upload_path . DIRECTORY_SEPARATOR . $url);
     }
+    unlink($upfile['tmp_name']);
+    // 图片旋转
+    if ($rotate > 0) {
+        image_rotate($upload_path . DIRECTORY_SEPARATOR . $url, $rotate);
+    }
     if ($file_type == 1 && ($width > 0 || $height > 0)) {
         $thumburl = thumb($upload_path . DIRECTORY_SEPARATOR . $url, $upload_path . DIRECTORY_SEPARATOR . getthumburl($url), '', $width, $height);
     }
@@ -745,6 +750,35 @@ function uploadfile ($upfile, $allow_type = 'jpg,jpeg,gif,png,bmp', $width = 80,
 function getthumburl ($url)
 {
     return substr($url, 0, strrpos($url, '.')) . 't.jpg';
+}
+
+function image_rotate($image_file, int $degrees = 90) {
+    $image_info = getimagesize($image_file);
+    $image_type = image_type_to_extension($image_info[2], false);
+
+    $createFun = 'imagecreatefrom' . $image_type;
+    if (!$resource = @$createFun($image_file)) {
+        return false;
+    }
+    if ($image_type === 'png') {
+        // 透明背景
+        imagealphablending($resource, false);
+        imagesavealpha($resource, true);
+        $pngTransparency = imagecolorallocatealpha($resource, 0, 0, 0, 127);
+        imagefill($resource, 0, 0, $pngTransparency);
+        if ($res = imagerotate($resource, $degrees, $pngTransparency)) {
+            imagealphablending($res, false);
+            imagesavealpha($res, true);
+            imagepng($res, $image_file);
+        }
+    } else {
+        if ($res = imagerotate($resource, $degrees, 0)) {
+            imagejpeg($res, $image_file);
+        }
+    }
+    imagedestroy($resource);
+    imagedestroy($res);
+    return true;
 }
 
 function thumb ($src_img, $thumbname, $type = '', $dst_w = 120, $dst_h = 120)
@@ -1107,4 +1141,31 @@ function export_csv_data ($fileName, $header, array $list = [])
 
     echo mb_convert_encoding(implode("\n", $input), 'GB2312', 'UTF-8');
     exit(0);
+}
+
+function conver_chinese_dollar (float $num)
+{
+    $zh_num = ['零', '壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '玖'];
+    $zh_unit = ['分', '角', '元', '拾', '佰', '仟', '万', '拾', '佰', '仟', '亿', '拾', '佰', '仟'];
+    if (!is_numeric(str_replace(',', '', $num))) {
+        return $num;
+    }
+    $number = strrev(round(str_replace(',', '', $num), 2) * 100);
+    $length = strlen($number);
+    $ch_str = '';
+    for ($length; $length > 0; $length--) {
+        $index = $length - 1;
+        if ($number[$index] == '0' && !in_array($zh_unit[$index], ['万', '元', '亿'])) {
+            $ch_str.=$zh_num[$number[$index]];
+        } elseif ($number[$index] == '0' && in_array($zh_unit[$index], ['万', '元', '亿'])) {
+            $ch_str.= $zh_unit[$index];
+        } else {
+            $ch_str.=$zh_num[$number[$index]] . $zh_unit[$index];
+        }
+    }
+    $format_str = trim(preg_replace(['/零{2,}/u', '/零万/', '/零元/', '/零亿/'], ['零', '万', '元', '亿'], $ch_str), '零');
+    if (preg_match('/(分|角)/', $format_str) === 0) {
+        $format_str.='整';
+    }
+    return $format_str;
 }

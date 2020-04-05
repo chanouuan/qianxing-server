@@ -247,7 +247,7 @@ class UserModel extends Crud {
         foreach ($userList as $k => $v) {
             $userList[$k]['nick_name'] = get_real_val($v['full_name'], $v['nick_name'], $v['telephone']);
         }
-        return array_column($userList, 'nickname', 'id');
+        return array_column($userList, 'nick_name', 'id');
     }
 
     /**

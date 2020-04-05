@@ -10,6 +10,32 @@ class AdminModel extends Crud {
     protected $table = 'admin_user';
 
     /**
+     * 获取执法证号-根据 user_id
+     * @return array
+     */
+    public function getLawNumByUser (array $user_id)
+    {
+        if (!$user_id = array_unique(array_filter($user_id))) {
+            return [];
+        }
+        // 获取用户手机号
+        if (!$userInfo = (new UserModel())->select(['id' => ['in', $user_id]], 'id,telephone')) {
+            return [];
+        }
+        $userInfo = array_column($userInfo, 'telephone', 'id');
+        if (!$adminInfo = $this->select(['telephone' => ['in', $userInfo]], 'telephone,law_num')) {
+            return [];
+        }
+        // 获取管理员执法证号，通过手机号关联
+        $adminInfo = array_column($adminInfo, 'law_num', 'telephone');
+        foreach ($userInfo as $k => $v) {
+            $userInfo[$k] = isset($adminInfo[$v]) ? $adminInfo[$v] : '';
+        }
+        unset($adminInfo);
+        return $userInfo;
+    }
+
+    /**
      * 获取用户信息
      * @return array
      */

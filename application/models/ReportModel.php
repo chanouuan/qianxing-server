@@ -94,7 +94,9 @@ class ReportModel extends Crud {
                 'involved_action_type' => json_encode($post['involved_action_type']),
                 'involved_build_project' => $post['involved_build_project'],
                 'involved_act' => $post['involved_act'],
-                'extra_info' => $post['extra_info']
+                'extra_info' => $post['extra_info'],
+                'check_start_time' => date('Y-m-d H:i:s', TIMESTAMP - 600),
+                'check_end_time' => date('Y-m-d H:i:s', TIMESTAMP)
             ])) {
                 return false;
             }
@@ -157,6 +159,10 @@ class ReportModel extends Crud {
         }
         $post['plate_num'] = check_car_license($post['plate_num']) ? $post['plate_num'] : null; // 车牌号
 
+        if (!$post['report_field']) {
+            return error('保存信息为空');
+        }
+
         if (!$reportInfo = $this->getDb()->table('qianxing_report_info')->field('site_photos')->where(['id' => $post['report_id']])->find()) {
             return error('案件未找到');
         }
@@ -165,7 +171,15 @@ class ReportModel extends Crud {
             return error('上传失败');
         }
 
-        $uploadfile = uploadfile($_FILES['upfile'], 'jpg,jpeg,png', 0, 0);
+        // 签名图片要旋转 90 度
+        $rotate = (
+            $post['report_field'] === 'signature_checker' || 
+            $post['report_field'] === 'signature_writer' || 
+            $post['report_field'] === 'signature_agent' || 
+            $post['report_field'] === 'signature_invitee'
+            ) ? 90 : 0;
+
+        $uploadfile = uploadfile($_FILES['upfile'], 'jpg,jpeg,png', 0, 0, $rotate);
         if ($uploadfile['errorcode'] !== 0) {
             return $uploadfile;
         }
@@ -259,19 +273,21 @@ class ReportModel extends Crud {
         // 新增案件
         if (!$report_id = $this->getDb()->transaction(function ($db) use ($userReport) {
             if (!$report_id = $this->getDb()->insert([
-                'adcode'      => $userReport['adcode'],
-                'location'    => $userReport['location'],
-                'address'     => $userReport['address'],
+                'adcode' => $userReport['adcode'],
+                'location' => $userReport['location'],
+                'address' => $userReport['address'],
                 'user_mobile' => $userReport['user_mobile'],
-                'law_id'      => $this->userInfo['id'],
+                'law_id' => $this->userInfo['id'],
                 'report_time' => $userReport['create_time'],
-                'status'      => ReportStatus::ACCEPT,
+                'status' => ReportStatus::ACCEPT,
                 'create_time' => date('Y-m-d H:i:s', TIMESTAMP)
             ], true)) {
                 return false;
             }
             if (!$this->getDb()->table('qianxing_report_info')->insert([
-                'id'         => $report_id,
+                'id' => $report_id,
+                'check_start_time' => date('Y-m-d H:i:s', TIMESTAMP - 600),
+                'check_end_time' => date('Y-m-d H:i:s', TIMESTAMP),
                 'event_time' => $userReport['create_time']
             ])) {
                 return false;
@@ -296,11 +312,20 @@ class ReportModel extends Crud {
             return success([]);
         }
 
-        if (!$reportInfo = $this->find(['id' => $post['report_id']], 'id,adcode,location,address,user_id,user_mobile,colleague_id,stake_number,pay,status,create_time')) {
+        if (!$reportInfo = $this->find(['id' => $post['report_id']], 'id,adcode,location,address,user_id,user_mobile,law_id,colleague_id,stake_number,pay,status,create_time')) {
             return error('案件未找到');
         }
 
         $reportInfo['pay'] = round_dollar($reportInfo['pay']);
+
+        if ($post['data_type'] == 'all' || $post['data_type'] == 'paper') {
+            // 路产受损赔付清单
+            $reportInfo['items'] = $this->getDb()->field('property_id,name,unit,price,amount,total_money')->table('qianxing_report_item')->where(['report_id' => $post['report_id']])->select();
+            foreach ($reportInfo['items'] as $k => $v) {
+                $reportInfo['items'][$k]['price'] = round_dollar($v['price']);
+                $reportInfo['items'][$k]['total_money'] = round_dollar($v['total_money']);
+            }
+        }
 
         $fields = null;
         if ($post['data_type'] == 'info') {
@@ -309,17 +334,20 @@ class ReportModel extends Crud {
         } else if ($post['data_type'] == 'card') {
             // 当事人信息
             $fields = 'addr,full_name,idcard,gender,birthday,plate_num';
+        } else if ($post['data_type'] == 'paper') {
+            // 勘验笔录信息
+            $fields = 'check_start_time,check_end_time,event_time,weather,car_type,full_name,plate_num,involved_action,involved_build_project,involved_act,involved_action_type,extra_info,signature_checker,signature_writer,signature_agent,signature_invitee';
         }
 
         $reportInfo += $this->getDb()->field($fields)->table('qianxing_report_info')->where(['id' => $post['report_id']])->limit(1)->find();
 
-        if ($post['data_type'] == 'all') {
-            // 路产受损赔付清单
-            $reportInfo['items'] = $this->getDb()->field('property_id,name,unit,price,amount,total_money')->table('qianxing_report_item')->where(['report_id' => $post['report_id']])->select();
-            foreach ($reportInfo['items'] as $k => $v) {
-                $reportInfo['items'][$k]['price'] = round_dollar($v['price']);
-                $reportInfo['items'][$k]['total_money'] = round_dollar($v['total_money']);
-            }
+        if ($post['data_type'] == 'paper') {
+            $reportInfo['weather'] = Weather::getMessage($reportInfo['weather']);
+            $reportInfo['car_type'] = CarType::getMessage($reportInfo['car_type']);
+            // 获取勘验人和记录人的执法证号
+            $lawNums = (new AdminModel())->getLawNumByUser([$reportInfo['law_id'], $reportInfo['colleague_id']]);
+            $reportInfo['law_lawnum'] = strval($lawNums[$reportInfo['law_id']]);
+            $reportInfo['colleague_lawnum'] = strval($lawNums[$reportInfo['colleague_id']]);
         }
 
         if (isset($reportInfo['idcard_front'])) {
@@ -357,6 +385,18 @@ class ReportModel extends Crud {
         }
         if (isset($reportInfo['involved_action_type'])) {
             $reportInfo['involved_action_type'] = $reportInfo['involved_action_type'] ? json_decode($reportInfo['involved_action_type'], true) : [];
+        }
+        if (isset($reportInfo['signature_checker'])) {
+            $reportInfo['signature_checker'] = httpurl($reportInfo['signature_checker']);
+        }
+        if (isset($reportInfo['signature_writer'])) {
+            $reportInfo['signature_writer'] = httpurl($reportInfo['signature_writer']);
+        }
+        if (isset($reportInfo['signature_agent'])) {
+            $reportInfo['signature_agent'] = httpurl($reportInfo['signature_agent']);
+        }
+        if (isset($reportInfo['signature_invitee'])) {
+            $reportInfo['signature_invitee'] = httpurl($reportInfo['signature_invitee']);
         }
 
         return success($reportInfo);
@@ -424,22 +464,22 @@ class ReportModel extends Crud {
             if ($post['report_id']) {
                 // 更新案件
                 if (false === $this->getDb()->where(['id' => $post['report_id'], 'status' => ReportStatus::ACCEPT])->update([
-                    'adcode'       => $post['adcode'],
-                    'location'     => $post['location'],
-                    'address'      => $post['address'],
+                    'adcode' => $post['adcode'],
+                    'location' => $post['location'],
+                    'address' => $post['address'],
                     'stake_number' => $post['stake_number'],
                     'colleague_id' => $post['colleague_id'],
-                    'update_time'  => date('Y-m-d H:i:s', TIMESTAMP)
+                    'update_time' => date('Y-m-d H:i:s', TIMESTAMP)
                 ])) {
                     return false;
                 }
                 if (false === $this->getDb()->table('qianxing_report_info')->where(['id' => $post['report_id']])->update([
-                    'event_time'    => $post['event_time'],
-                    'weather'       => $post['weather'],
-                    'car_type'      => $post['car_type'],
-                    'event_type'    => $post['event_type'],
-                    'driver_state'  => $post['driver_state'],
-                    'car_state'     => $post['car_state'],
+                    'event_time' => $post['event_time'],
+                    'weather' => $post['weather'],
+                    'car_type' => $post['car_type'],
+                    'event_type' => $post['event_type'],
+                    'driver_state' => $post['driver_state'],
+                    'car_state' => $post['car_state'],
                     'traffic_state' => $post['traffic_state']
                 ])) {
                     return false;
@@ -448,27 +488,29 @@ class ReportModel extends Crud {
             } else {
                 // 新增案件
                 if (!$report_id = $this->getDb()->insert([
-                    'adcode'       => $post['adcode'],
-                    'location'     => $post['location'],
-                    'address'      => $post['address'],
+                    'adcode' => $post['adcode'],
+                    'location' => $post['location'],
+                    'address' => $post['address'],
                     'stake_number' => $post['stake_number'],
                     'colleague_id' => $post['colleague_id'],
-                    'law_id'       => $this->userInfo['id'],
-                    'status'       => ReportStatus::ACCEPT,
-                    'report_time'  => date('Y-m-d H:i:s', TIMESTAMP),
-                    'create_time'  => date('Y-m-d H:i:s', TIMESTAMP)
+                    'law_id' => $this->userInfo['id'],
+                    'status' => ReportStatus::ACCEPT,
+                    'report_time' => date('Y-m-d H:i:s', TIMESTAMP),
+                    'create_time' => date('Y-m-d H:i:s', TIMESTAMP)
                 ], true)) {
                     return false;
                 }
                 if (!$this->getDb()->table('qianxing_report_info')->insert([
-                    'id'            => $report_id,
-                    'event_time'    => $post['event_time'],
-                    'weather'       => $post['weather'],
-                    'car_type'      => $post['car_type'],
-                    'event_type'    => $post['event_type'],
-                    'driver_state'  => $post['driver_state'],
-                    'car_state'     => $post['car_state'],
-                    'traffic_state' => $post['traffic_state']
+                    'id' => $report_id,
+                    'event_time' => $post['event_time'],
+                    'weather' => $post['weather'],
+                    'car_type' => $post['car_type'],
+                    'event_type' => $post['event_type'],
+                    'driver_state' => $post['driver_state'],
+                    'car_state' => $post['car_state'],
+                    'traffic_state' => $post['traffic_state'],
+                    'check_start_time' => date('Y-m-d H:i:s', TIMESTAMP - 600),
+                    'check_end_time' => date('Y-m-d H:i:s', TIMESTAMP)
                 ])) {
                     return false;
                 }
@@ -523,12 +565,14 @@ class ReportModel extends Crud {
                 return false;
             }
             if (false === $this->getDb()->table('qianxing_report_info')->where(['id' => $post['report_id']])->update([
-                'addr'      => $post['addr'],
+                'addr' => $post['addr'],
                 'full_name' => $post['full_name'],
                 'plate_num' => $post['plate_num'],
-                'idcard'    => $post['idcard'],
-                'gender'    => $post['gender'],
-                'birthday'  => $post['birthday']
+                'idcard' => $post['idcard'],
+                'gender' => $post['gender'],
+                'birthday' => $post['birthday'],
+                'check_start_time' => date('Y-m-d H:i:s', TIMESTAMP - 600),
+                'check_end_time' => date('Y-m-d H:i:s', TIMESTAMP)
             ])) {
                 return false;
             }

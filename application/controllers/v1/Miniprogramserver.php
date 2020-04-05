@@ -36,6 +36,7 @@ class Miniprogramserver extends ActionPDO {
 
     public function _init()
     {
+        
     }
 
     /**
@@ -205,7 +206,7 @@ class Miniprogramserver extends ActionPDO {
     }
 
     /**
-     * 获取案件信息(管理端)
+     * 获取案件信息
      * @login
      * @return array
      * {
