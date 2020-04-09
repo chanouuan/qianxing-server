@@ -33,6 +33,93 @@ class ReportModel extends Crud {
     }
 
     /**
+     * 生成交易单的回调函数
+     * @return array
+     */
+    public function createPay (int $user_id, array $post)
+    {
+        if (!$reportInfo = $this->find(['id' => $post['order_id'], 'user_id' => $user_id, 'status' => ReportStatus::HANDLED], 'id,pay,law_id')) {
+            return error('案件未找到');
+        }
+
+        return success([
+            'pay' => $reportInfo['pay'],
+            'money' => $reportInfo['pay']
+        ]);
+    }
+
+    /**
+     * 支付成功的回调函数
+     * @return bool
+     */
+    public function paySuccess (array $trade)
+    {
+        if (!$this->getDb()->where(['id' => $trade['order_id'], 'status' => ReportStatus::HANDLED])->update([
+            'status' => ReportStatus::COMPLETE,
+            'update_time' => date('Y-m-d H:i:s', TIMESTAMP)
+        ])) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * 支付完成的回调函数
+     * @return mixed
+     */
+    public function payComplete (array $trade)
+    {
+        // todo 通知路政执法人员
+    }
+
+    /**
+     * 获取赔偿清单
+     * @return array
+     */
+    public function getPropertyPayItems (int $user_id, array $post)
+    {
+        $post['report_id'] = intval($post['report_id']);
+
+        if (!$this->count(['id' => $post['report_id'], 'user_id' => $user_id])) {
+            return error('案件未找到');
+        }
+
+        if (!$list = $this->getDb()->field('id,name,unit,amount,total_money')->table('qianxing_report_item')->where(['report_id' => $post['report_id']])->select()) {
+            return success([]);
+        }
+
+        foreach ($list as $k => $v) {
+            $list[$k]['total_money'] = round_dollar($v['total_money']);
+        }
+
+        return success($list); 
+    }
+
+    /**
+     * 下发赔偿通知书
+     * @return array
+     */
+    public function reportFile (array $post)
+    {
+        $post['report_id'] = intval($post['report_id']);
+
+        if (!$reportInfo = $this->find(['id' => $post['report_id'], 'law_id' => $this->userInfo['id'], 'status' => ReportStatus::ACCEPT], 'id,user_id')) {
+            return error('案件未找到');
+        }
+
+        if (!$this->getDb()->where(['id' => $post['report_id'], 'status' => ReportStatus::ACCEPT])->update([
+            'status' => ReportStatus::HANDLED,
+            'handle_time' => date('Y-m-d H:i:s', TIMESTAMP),
+            'update_time' => date('Y-m-d H:i:s', TIMESTAMP)
+        ])) {
+            return error('数据保存失败');
+        }
+
+        // todo 通知用户
+        return success('ok');
+    }
+
+    /**
      * 保存勘验笔录
      * @return array
      */
@@ -62,7 +149,7 @@ class ReportModel extends Crud {
 
         $items = [];
         if ($post['items']) {
-            if (!$properties = (new PropertyModel())->getProperties(['id' => ['in', array_column($post['items'], 'property_id')]])) {
+            if (!$properties = (new PropertyModel())->select(['id' => ['in', array_column($post['items'], 'property_id')]], 'id,category,name,unit')) {
                 return error('获取路产项目失败');
             }
             $properties = array_column($properties, null, 'id');
@@ -220,30 +307,57 @@ class ReportModel extends Crud {
      */
     public function getReportEvents (int $user_id, array $post) 
     {
-        $post['status']   = ReportStatus::format($post['status']);
+        $post['islaw'] = $post['islaw'] ? 1 : 0;
+        $post['status'] = intval($post['status']);
         $post['lastpage'] = intval($post['lastpage']);
 
         $result = [
-            'limit'    => 5,
+            'limit' => 5,
             'lastpage' => '',
-            'list'     => []
+            'list' => []
         ];
 
-        $condition = [];
+        // 搜索案件状态
+        $status = [
+            0 => [
+                0 => ['in', [2, 3]], // 全部案件
+                1 => 3, // 已完成
+            ],
+            1 => [
+                1 => 1, // 审理中
+                2 => ['in', [2, 3]], // 已完成
+            ]
+        ];
+
+        $condition = [
+            $post['islaw'] ? 'law_id' : 'user_id' => $user_id
+        ];
         if ($post['lastpage']) {
             $condition['id'] = ['<', $post['lastpage']];
         }
-        if ($post['islaw']) {
-            $condition['law_id'] = $user_id;
+        if (isset($status[$post['islaw']][$post['status']])) {
+            $condition['status'] = $status[$post['islaw']][$post['status']];
         } else {
-            $condition['user_id'] = $user_id;
-        }
-        if (!is_null($post['status'])) {
-            $condition['status'] = $post['status'];
+            return success($result);
         }
 
-        if (!$result['list'] = $this->getDb()->field('id,location,address,user_mobile,pay,status,create_time')->where($condition)->order('id desc')->limit($result['limit'])->select()) {
+        if (!$result['list'] = $this->getDb()->field('id,group_id,location,address,user_mobile,stake_number,pay,status,create_time')->where($condition)->order('id desc')->limit($result['limit'])->select()) {
             return success($result);
+        }
+
+        if (!$post['islaw']) {
+            // 用户端
+            $infos = $this->getDb()->table('qianxing_report_info')->field('id,event_time,full_name,plate_num')->where(['id' => ['in', array_column($result['list'], 'id')]])->select();
+            $infos = array_column($infos, null, 'id');
+            $groups = (new GroupModel())->select(['id' => ['in', array_column($result['list'], 'group_id')]], 'id,name');
+            $groups = array_column($groups, 'name', 'id');
+            foreach ($result['list'] as $k => $v) {
+                $result['list'][$k]['event_time'] = $infos[$v['id']]['event_time'];
+                $result['list'][$k]['full_name'] = $infos[$v['id']]['full_name'];
+                $result['list'][$k]['plate_num'] = $infos[$v['id']]['plate_num'];
+                $result['list'][$k]['group_name'] = $groups[$v['group_id']];
+            }
+            unset($infos, $groups);
         }
 
         foreach ($result['list'] as $k => $v) {
@@ -273,7 +387,7 @@ class ReportModel extends Crud {
         // 新增案件
         if (!$report_id = $this->getDb()->transaction(function ($db) use ($userReport) {
             if (!$report_id = $this->getDb()->insert([
-                'adcode' => $userReport['adcode'],
+                'group_id' => $this->userInfo['group_id'],
                 'location' => $userReport['location'],
                 'address' => $userReport['address'],
                 'user_mobile' => $userReport['user_mobile'],
@@ -289,6 +403,11 @@ class ReportModel extends Crud {
                 'check_start_time' => date('Y-m-d H:i:s', TIMESTAMP - 600),
                 'check_end_time' => date('Y-m-d H:i:s', TIMESTAMP),
                 'event_time' => $userReport['create_time']
+            ])) {
+                return false;
+            }
+            if (false === $this->getDb()->table('qianxing_user_report')->where(['id' => $userReport['id']])->update([
+                'report_id' => $report_id
             ])) {
                 return false;
             }
@@ -312,7 +431,7 @@ class ReportModel extends Crud {
             return success([]);
         }
 
-        if (!$reportInfo = $this->find(['id' => $post['report_id']], 'id,adcode,location,address,user_id,user_mobile,law_id,colleague_id,stake_number,pay,status,create_time')) {
+        if (!$reportInfo = $this->find(['id' => $post['report_id']], 'id,group_id,location,address,user_id,user_mobile,law_id,colleague_id,stake_number,pay,status,create_time')) {
             return error('案件未找到');
         }
 
@@ -434,7 +553,6 @@ class ReportModel extends Crud {
     public function reportInfo (array $post)
     {
         $post['report_id']     = intval($post['report_id']);
-        $post['adcode']        = intval($post['adcode']);
         $post['location']      = LocationUtils::checkLocation($post['location']);
         $post['address']       = trim_space($post['address'], 0, 100);
         $post['colleague_id']  = intval($post['colleague_id']); 
@@ -464,7 +582,6 @@ class ReportModel extends Crud {
             if ($post['report_id']) {
                 // 更新案件
                 if (false === $this->getDb()->where(['id' => $post['report_id'], 'status' => ReportStatus::ACCEPT])->update([
-                    'adcode' => $post['adcode'],
                     'location' => $post['location'],
                     'address' => $post['address'],
                     'stake_number' => $post['stake_number'],
@@ -488,7 +605,7 @@ class ReportModel extends Crud {
             } else {
                 // 新增案件
                 if (!$report_id = $this->getDb()->insert([
-                    'adcode' => $post['adcode'],
+                    'group_id' => $this->userInfo['group_id'],
                     'location' => $post['location'],
                     'address' => $post['address'],
                     'stake_number' => $post['stake_number'],
@@ -594,27 +711,19 @@ class ReportModel extends Crud {
     }
 
     /**
-     * 撤销报警
+     * 撤销案件
      * @return array
      */
-    public function cancelReportEvent (int $user_id, array $post)
+    public function cancelReport (array $post)
     {
-        $post['order_id'] = intval($post['order_id']);
+        $post['report_id'] = intval($post['report_id']);
 
-        if (!$orderInfo = $this->find(['id' => $post['order_id']], 'id,user_id,status')) {
-            return error('报案记录不存在');
+        if (!$reportInfo = $this->find(['id' => $post['report_id'], 'law_id' => $this->userInfo['id'], 'status' => ReportStatus::ACCEPT], 'id')) {
+            return error('案件未找到');
         }
 
-        if ($orderInfo['user_id'] != $user_id) {
-            return error('你不是报案人，不能取消该报案记录');
-        }
-
-        if ($orderInfo['status'] != ReportStatus::WAITING) {
-            return error('当前报案状态不能撤销');
-        }
-
-        if (!$this->getDb()->where(['id' => $orderInfo['id'], 'status' => $orderInfo['status']])->update([
-            'status'      => ReportStatus::CANCEL,
+        if (!$this->getDb()->where(['id' => $post['report_id']])->update([
+            'status' => ReportStatus::CANCEL,
             'update_time' => date('Y-m-d H:i:s', TIMESTAMP)
         ])) {
             return error('数据更新失败');

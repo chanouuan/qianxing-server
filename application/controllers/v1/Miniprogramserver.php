@@ -7,6 +7,8 @@ use app\models\UserModel;
 use app\models\ReportModel;
 use app\models\UserReportModel;
 use app\models\PropertyModel;
+use app\models\GroupModel;
+use app\models\TradeModel;
 
 /**
  * 小程序服务端接口
@@ -21,6 +23,7 @@ class Miniprogramserver extends ActionPDO {
             'login'               => ['interval' => 1000],
             'changePhone'         => ['interval' => 1000],
             'sendSms'             => ['interval' => 1000, 'rule' => '5|10|20'],
+            'getDistrictGroup'    => ['interval' => 1000],
             'reportEvent'         => ['interval' => 1000],
             'getUserReportEvents' => ['interval' => 200],
             'getReportEvents'     => ['interval' => 200],
@@ -30,7 +33,13 @@ class Miniprogramserver extends ActionPDO {
             'reloadReport'        => ['interval' => 1000],
             'cardInfo'            => ['interval' => 1000],
             'searchPropertyItems' => ['interval' => 200],
-            'reportItem'          => ['interval' => 1000]
+            'reportItem'          => ['interval' => 1000],
+            'reportFile'          => ['interval' => 1000],
+            'cancelReport'        => ['interval' => 1000],
+            'deleteReport'        => ['interval' => 1000],
+            'getPropertyPayItems' => ['interval' => 1000],
+            'createPay'           => ['interval' => 1000],
+            'payQuery'            => ['interval' => 1000]
         ];
     }
 
@@ -148,6 +157,21 @@ class Miniprogramserver extends ActionPDO {
     public function sendSms () 
     {
         return (new UserModel())->sendSmsCode($_POST);
+    }
+    
+    /**
+     * 获取区域执法单位
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":[]
+     * }
+     */
+    public function getDistrictGroup ()
+    {
+        return (new GroupModel())->getDistrictGroup($_POST);
     }
 
     /**
@@ -322,6 +346,97 @@ class Miniprogramserver extends ActionPDO {
     public function reportItem ()
     {
         return (new ReportModel($this->_G['user']['user_id']))->reportItem($_POST);
+    }
+
+    /**
+     * 下发赔偿通知书
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":[]
+     * }
+     */
+    public function reportFile ()
+    {
+        return (new ReportModel($this->_G['user']['user_id']))->reportFile($_POST);
+    }
+
+    /**
+     * 撤销案件
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":[]
+     * }
+     */
+    public function cancelReport ()
+    {
+        return (new ReportModel($this->_G['user']['user_id']))->cancelReport($_POST);
+    }
+
+    /**
+     * 删除报案
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":[]
+     * }
+     */
+    public function deleteReport ()
+    {
+        return (new UserReportModel())->deleteReport($this->_G['user']['user_id'], $_POST);
+    }
+
+    /**
+     * 获取赔偿清单
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":[]
+     * }
+     */
+    public function getPropertyPayItems ()
+    {
+        return (new ReportModel())->getPropertyPayItems($this->_G['user']['user_id'], $_POST);
+    }
+
+    /**
+     * 生成交易单
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":{
+     *      "trade_id":1
+     * }}
+     */
+    public function createPay ()
+    {
+        return (new TradeModel())->createPay($this->_G['user']['user_id'], $_POST);
+    }
+
+    /**
+     * 查询支付
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":{}
+     * }
+     */
+    public function payQuery ()
+    {
+        return (new TradeModel())->payQuery($this->_G['user']['user_id'], $_POST);
     }
 
 }

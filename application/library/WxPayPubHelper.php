@@ -153,7 +153,7 @@ class Common_util_pub
 	/**
 	 * 	作用：以post方式提交xml到对应的接口url
 	 */
-	public function postXmlCurl($xml,$url,$second=30)
+	public function postXmlCurl($xml,$url,$second=5)
 	{
         //初始化curl
        	$ch = curl_init();
@@ -193,7 +193,7 @@ class Common_util_pub
 	/**
 	 * 	作用：使用证书，以post方式提交xml到对应的接口url
 	 */
-	function postXmlSSLCurl($xml,$url,$second=30)
+	function postXmlSSLCurl($xml,$url,$second=5)
 	{
 		$ch = curl_init();
 		//超时时间
@@ -318,7 +318,7 @@ class UnifiedOrder_pub extends Wxpay_client_pub
 		//设置接口链接
 		$this->url = "https://api.mch.weixin.qq.com/pay/unifiedorder";
 		//设置curl超时时间
-		$this->curl_timeout = 30;
+		$this->curl_timeout = 5;
 	}
 
 	/**
@@ -379,7 +379,7 @@ class OrderQuery_pub extends Wxpay_client_pub
 		//设置接口链接
 		$this->url = "https://api.mch.weixin.qq.com/pay/orderquery";
 		//设置curl超时时间
-		$this->curl_timeout = 30;
+		$this->curl_timeout = 5;
 	}
 
 	/**
@@ -418,7 +418,7 @@ class Refund_pub extends Wxpay_client_pub
 		//设置接口链接
 		$this->url = "https://api.mch.weixin.qq.com/secapi/pay/refund";
 		//设置curl超时时间
-		$this->curl_timeout = 30;
+		$this->curl_timeout = 5;
 	}
 
 	/**
@@ -473,7 +473,7 @@ class RefundQuery_pub extends Wxpay_client_pub
 		//设置接口链接
 		$this->url = "https://api.mch.weixin.qq.com/pay/refundquery";
 		//设置curl超时时间
-		$this->curl_timeout = 30;
+		$this->curl_timeout = 5;
 	}
 
 	/**
@@ -524,7 +524,7 @@ class DownloadBill_pub extends Wxpay_client_pub
 		//设置接口链接
 		$this->url = "https://api.mch.weixin.qq.com/pay/downloadbill";
 		//设置curl超时时间
-		$this->curl_timeout = 30;
+		$this->curl_timeout = 5;
 	}
 
 	/**
@@ -573,7 +573,7 @@ class ShortUrl_pub extends Wxpay_client_pub
 		//设置接口链接
 		$this->url = "https://api.mch.weixin.qq.com/tools/shorturl";
 		//设置curl超时时间
-		$this->curl_timeout = 30;
+		$this->curl_timeout = 5;
 	}
 
 	/**
@@ -782,7 +782,7 @@ class JsApi_pub extends Common_util_pub
 	function __construct()
 	{
 		//设置curl超时时间
-		$this->curl_timeout = 30;
+		$this->curl_timeout = 5;
 	}
 
 	/**

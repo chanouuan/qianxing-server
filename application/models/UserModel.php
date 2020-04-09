@@ -170,6 +170,15 @@ class UserModel extends Crud {
     }
 
     /**
+     * 获取微信optionid
+     * @return string
+     */
+    public function getWxOpenId (int $user_id, $type = 'mp')
+    {
+        return $this->getDb()->table('pro_login_binding')->field('openid')->where(['user_id' => $user_id, 'type' => $type])->limit(1)->count();
+    }
+
+    /**
      * 更新用户信息
      * @return array
      */

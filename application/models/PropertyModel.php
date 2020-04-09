@@ -10,15 +10,6 @@ class PropertyModel extends Crud {
     protected $table = 'qianxing_property';
 
     /**
-     * 获取路产项目
-     * @return array
-     */
-    public function getProperties (array $condition, $field = null)
-    {
-        return $this->select($condition, $field);
-    }
-
-    /**
      * 搜索路产赔损项目
      * @return array
      */

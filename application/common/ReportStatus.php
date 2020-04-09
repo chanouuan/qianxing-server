@@ -13,15 +13,17 @@ class ReportStatus
     const REFUND    = -1;
     const WAITING   = 0;
     const ACCEPT    = 1;
-    const HANDLE    = 2;
+    const HANDLED   = 2;
+    CONST COMPLETE  = 3;
 
     static $message = [
         -3 => '已撤销',
         -2 => '退费中',
         -1 => '已退费',
          0 => '待受理',
-         1 => '已受理',
-         2 => '已处置'
+         1 => '受理中',
+         2 => '已受理',
+         3 => '已完成'
     ];
 
     public static function format ($code)

@@ -80,6 +80,14 @@ function get_real_val (...$args)
     return '';
 }
 
+function import_library ($path)
+{
+    $path = trim($path, DIRECTORY_SEPARATOR) . '.php';
+    require_once implode(DIRECTORY_SEPARATOR, [
+        APPLICATION_PATH, 'application', DIRECTORY_SEPARATOR, 'library', $path
+    ]);
+}
+
 function getSysConfig ($key = null, $target = 'config')
 {
     static $sys_config = [];
