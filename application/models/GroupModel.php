@@ -10,6 +10,45 @@ class GroupModel extends Crud {
     protected $table = 'admin_group';
 
     /**
+     * 移交部门人员
+     * @return array
+     * }
+     */
+    public function getGroupBook (int $user_id, array $post)
+    {
+        $post['level'] = intval($post['level']);
+        $post['column'] = intval($post['column']);
+        $post['value'] = intval($post['value']);
+        $result = [];
+
+        if ($post['level'] == 1) {
+            // 只看本部门的
+            $userModel = new UserModel();
+            $userInfo = $userModel->checkUserInfo($user_id);
+            $result[0] = $userModel->select(['group_id' => $userInfo['group_id'], 'status' => 1], 'id,full_name as name');
+            return success($result);
+        }
+        
+        if ($post['value'] == 0) {
+            // 首次加载
+            $result[0] = $this->select(['level' => 2], 'id,district as name', 'sort desc');
+            $post['value'] = $result[0][0]['id'];
+        }
+
+        if ($post['column'] == 0) {
+            // 获取单位
+            $result[1] = $this->select(['parent_id' => $post['value'], 'level' => 3], 'id,concat(district,name) as name', 'sort desc');
+            $post['value'] = $result[1][0]['id'];
+        }
+
+        if ($post['column'] == 1 || $post['level'] == 3) {
+            // 获取人员
+            $result[2] = (new UserModel())->select(['group_id' => $post['value'], 'status' => 1], 'id,full_name as name');
+        }
+        return success($result);
+    }
+
+    /**
      * 获取区域执法单位
      * @return array
      */

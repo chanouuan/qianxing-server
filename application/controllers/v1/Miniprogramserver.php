@@ -39,7 +39,10 @@ class Miniprogramserver extends ActionPDO {
             'deleteReport'        => ['interval' => 1000],
             'getPropertyPayItems' => ['interval' => 1000],
             'createPay'           => ['interval' => 1000],
-            'payQuery'            => ['interval' => 1000]
+            'payQuery'            => ['interval' => 1000],
+            'getGroupBook'        => ['interval' => 200],
+            'trunReport'          => ['interval' => 1000],
+            'trunUserReport'      => ['interval' => 1000]
         ];
     }
 
@@ -191,6 +194,7 @@ class Miniprogramserver extends ActionPDO {
 
     /**
      * 获取用户报案记录
+     * @login
      * @param lastpage 分页参数
      * @return array
      * {
@@ -206,7 +210,7 @@ class Miniprogramserver extends ActionPDO {
     public function getUserReportEvents () 
     {
         $_POST['status'] = 0; // 只获取未受理
-        return (new UserReportModel())->getUserReportEvents($_POST);
+        return (new UserReportModel())->getUserReportEvents($this->_G['user']['user_id'], $_POST);
     }
 
     /**
@@ -438,5 +442,51 @@ class Miniprogramserver extends ActionPDO {
     {
         return (new TradeModel())->payQuery($this->_G['user']['user_id'], $_POST);
     }
+
+    /**
+     * 移交部门人员
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":{}
+     * }
+     */
+    public function getGroupBook ()
+    {
+        return (new GroupModel())->getGroupBook($this->_G['user']['user_id'], $_POST);
+    }
+
+    /**
+     * 移交报案
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":{}
+     * }
+     */
+    public function trunUserReport ()
+    {
+        return (new UserReportModel())->trunUserReport($this->_G['user']['user_id'], $_POST);
+    }
+
+    /**
+     * 移交案件
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":{}
+     * }
+     */
+    public function trunReport ()
+    {
+        return (new ReportModel($this->_G['user']['user_id']))->trunReport($_POST);
+    }
+    
 
 }

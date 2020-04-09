@@ -33,6 +33,41 @@ class ReportModel extends Crud {
     }
 
     /**
+     * 移交案件
+     * @return array
+     */
+    public function trunReport (array $post)
+    {
+        $post['report_id'] = intval($post['report_id']);
+        $post['target_id'] = intval($post['target_id']); // 执法人员
+
+        // 已是自己
+        if ($this->userInfo['id'] == $post['target_id']) {
+            return success('ok');
+        }
+
+        // 同部门
+        if (!(new UserModel())->count(['id' => $post['target_id'], 'group_id' => $this->userInfo['group_id']])) {
+            return error('该移交人不在同部门');
+        }
+
+        if (!$this->count(['id' => $post['report_id'], 'group_id' => $this->userInfo['group_id'], 'status' => ReportStatus::ACCEPT])) {
+            return error('案件信息未找到');
+        }
+
+        if (!$this->getDb()->where(['id' => $post['report_id'], 'status' => ReportStatus::ACCEPT])->update([
+            'law_id' => $post['target_id'],
+            'update_time' => date('Y-m-d H:i:s', TIMESTAMP)
+        ])) {
+            return error('数据更新失败');
+        }
+
+        // todo 通知移交人
+
+        return success('ok');
+    }
+
+    /**
      * 生成交易单的回调函数
      * @return array
      */

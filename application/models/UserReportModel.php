@@ -11,6 +11,43 @@ class UserReportModel extends Crud {
     protected $table = 'qianxing_user_report';
 
     /**
+     * 移交报案
+     * @return array
+     */
+    public function trunUserReport (int $user_id, array $post)
+    {
+        $userInfo = (new UserModel())->checkUserInfo($user_id);
+
+        $post['report_id'] = intval($post['report_id']);
+        $post['target_id'] = intval($post['target_id']); // 单位
+
+        // 已是自己单位
+        if ($userInfo['group_id'] == $post['target_id']) {
+            return success('ok');
+        }
+
+        // 效验单位
+        if (!(new GroupModel())->count(['id' => $post['target_id'], 'level' => 3])) {
+            return error('该单位未找到');
+        }
+
+        if (!$this->count(['id' => $post['report_id'], 'group_id' => $userInfo['group_id'], 'status' => ReportStatus::WAITING])) {
+            return error('报案信息未找到');
+        }
+
+        if (!$this->getDb()->where(['id' => $post['report_id'], 'status' => ReportStatus::WAITING])->update([
+            'group_id' => $post['target_id'],
+            'update_time' => date('Y-m-d H:i:s', TIMESTAMP)
+        ])) {
+            return error('数据更新失败');
+        }
+
+        // todo 通知单位
+
+        return success('ok');
+    }
+
+    /**
      * 采集用户报案信息
      * @return array
      */
@@ -38,8 +75,10 @@ class UserReportModel extends Crud {
      * 获取用户报案记录
      * @return array
      */
-    public function getUserReportEvents (array $post) 
+    public function getUserReportEvents (int $user_id, array $post) 
     {
+        $userInfo = (new UserModel())->checkUserInfo($user_id);
+
         $post['status']   = ReportStatus::format($post['status']);
         $post['lastpage'] = intval($post['lastpage']);
 
@@ -49,7 +88,9 @@ class UserReportModel extends Crud {
             'list'     => []
         ];
 
-        $condition = [];
+        $condition = [
+            'group_id' => $userInfo['group_id'] // 只获取本单位
+        ];
         if ($post['lastpage']) {
             $condition['id'] = ['<', $post['lastpage']];
         }

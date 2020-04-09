@@ -24,18 +24,16 @@ class WordModel extends Crud {
     public function getSavePath ($id, $suffix = '')
     {
         $id = intval($id);
-        return 'upload/word/' . ($id % 512) . '/' . md5($id . $suffix) . '.docx';
+        return 'docfile/' . ($id % 512) . '/' . md5($id . $suffix) . '.docx';
     }
 
     /**
      * 获取案件数据
      * @return array
      */
-    public function getReportData (int $user_id, array $post)
+    public function getReportData (array $condition)
     {
-        $post['report_id'] = intval($post['report_id']);
-
-        if (!$reportInfo = $this->getDb()->table('qianxing_report')->field('id,group_id,location,address,user_id,user_mobile,law_id,colleague_id,stake_number,pay,status,create_time')->where(['id' => $post['report_id']])->find()) {
+        if (!$reportInfo = $this->getDb()->table('qianxing_report')->field('id,group_id,location,address,user_id,user_mobile,law_id,colleague_id,stake_number,pay,status,create_time')->where($condition)->limit(1)->find()) {
             return [];
         }
 
@@ -45,10 +43,10 @@ class WordModel extends Crud {
         $groupInfo = (new GroupModel())->find(['id' => $reportInfo['group_id']], 'name');
         $reportInfo['group_name'] = $groupInfo['name'];
 
-        $reportInfo += $this->getDb()->table('qianxing_report_info')->where(['id' => $post['report_id']])->limit(1)->find();
+        $reportInfo += $this->getDb()->table('qianxing_report_info')->where(['id' => $reportInfo['id']])->limit(1)->find();
 
         // 路产受损赔付清单
-        $reportInfo['items'] = $this->getDb()->field('name,unit,price,amount,total_money')->table('qianxing_report_item')->where(['report_id' => $post['report_id']])->select();
+        $reportInfo['items'] = $this->getDb()->field('name,unit,price,amount,total_money')->table('qianxing_report_item')->where(['report_id' => $reportInfo['id']])->select();
         $reportInfo['items_content'] = $this->getBRline($reportInfo['items']);
         unset($reportInfo['items']);
 
