@@ -23,7 +23,7 @@ class ReportStatus
          0 => '待受理',
          1 => '受理中',
          2 => '已受理',
-         3 => '已完成'
+         3 => '已结案'
     ];
 
     public static function format ($code)

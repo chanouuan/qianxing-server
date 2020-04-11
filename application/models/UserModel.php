@@ -153,7 +153,7 @@ class UserModel extends Crud {
         // 关联报案当事人
         $reportModel->relationCase($user_id, $post['telephone']);
 
-        return success(['telephone' => $post['telephone']]);
+        return success($this->getUserInfo($user_id));
     }
 
     /**
