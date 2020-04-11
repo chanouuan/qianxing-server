@@ -42,6 +42,9 @@ class UserReportModel extends Crud {
             return error('数据更新失败');
         }
 
+        // 更新统计数
+        (new UserCountModel())->setReportCount('old', $post['target_id'], null, $userInfo['group_id']);
+
         // todo 通知单位
 
         return success('ok');
@@ -98,12 +101,13 @@ class UserReportModel extends Crud {
             $condition['status'] = $post['status'];
         }
 
-        if (!$result['list'] = $this->getDb()->field('id,location,address,user_mobile,status,create_time')->where($condition)->order('id desc')->limit($result['limit'])->select()) {
+        if (!$result['list'] = $this->getDb()->field('id,location,address,user_mobile,report_type,status,create_time')->where($condition)->order('id desc')->limit($result['limit'])->select()) {
             return success($result);
         }
 
         foreach ($result['list'] as $k => $v) {
             $result['lastpage'] = $v['id'];
+            $result['list'][$k]['report_type'] = ReportType::getMessage($v['report_type']);
             $result['list'][$k]['status_str'] = ReportStatus::getMessage($v['status']);
         }
 
@@ -163,6 +167,9 @@ class UserReportModel extends Crud {
             return error('数据保存失败');
         }
 
+        // 更新统计数
+        (new UserCountModel())->setReportCount('new', $post['group_id']);
+
         // todo 推送消息
 
         return success($groupInfo);
@@ -176,13 +183,16 @@ class UserReportModel extends Crud {
     {
         $post['report_id'] = intval($post['report_id']);
 
-        if (!$reportInfo = $this->find(['id' => $post['report_id'], 'status' => ReportStatus::WAITING], 'id')) {
+        if (!$reportInfo = $this->find(['id' => $post['report_id'], 'status' => ReportStatus::WAITING], 'id,group_id')) {
             return error('案件未找到');
         }
 
         if (!$this->getDb()->where(['id' => $post['report_id'], 'status' => ReportStatus::WAITING])->delete()) {
             return error('数据更新失败');
         }
+
+        // 更新统计数
+        (new UserCountModel())->setReportCount('old', null, null, $reportInfo['group_id']);
 
         return success('ok');
     }

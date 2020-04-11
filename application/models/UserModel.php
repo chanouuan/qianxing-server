@@ -21,14 +21,12 @@ class UserModel extends Crud {
             return error('授权码不能为空');
         }
 
-        if (false === ($bindingInfo = $this->getDb()
+        $bindingInfo = $this->getDb()
             ->table('pro_login_binding')
             ->field('user_id')
             ->where(['authcode' => $post['authcode']])
             ->limit(1)
-            ->find())) {
-            return error('查询错误');
-        }
+            ->find();
 
         if ($bindingInfo) {
             // 已绑定授权码
@@ -44,9 +42,7 @@ class UserModel extends Crud {
                 ], true)) {
                     return false;
                 }
-                if (!$this->getDb()->table('qianxing_user_count')->insert([
-                    'user_id' => $id
-                ])) {
+                if (!$this->getDb()->table('qianxing_user_count')->insert(['id' => $id])) {
                     return false;
                 }
                 if (!$this->getDb()->table('pro_login_binding')->insert([
@@ -99,11 +95,7 @@ class UserModel extends Crud {
         }
 
         // 判断该手机号是否管理员
-        if (false === ($adminInfo = (new AdminModel())->getUserInfo([
-            'telephone' => $post['telephone']
-        ]))) {
-            return error('查询错误');
-        }
+        $adminInfo = (new AdminModel())->getUserInfo(['telephone' => $post['telephone']]);
         $updateParams = [
             'telephone'   => $post['telephone'],
             'update_time' => date('Y-m-d H:i:s', TIMESTAMP)
@@ -129,12 +121,7 @@ class UserModel extends Crud {
         }
 
         // 获取该手机号已注册的用户
-        if (false === ($userInfo = $this->getUserInfo([
-            'telephone' => $post['telephone'],
-            'id' => ['<>', $user_id]
-        ], 'id'))) {
-            return error('查询错误');
-        }
+        $userInfo = $this->find(['telephone' => $post['telephone'], 'id' => ['<>', $user_id]], 'id');
 
         if (!$userInfo) {
             // 手机号未注册过
@@ -170,7 +157,26 @@ class UserModel extends Crud {
     }
 
     /**
-     * 获取微信optionid
+     * 更改用户信息
+     * @return array
+     */
+    public function saveUserInfo (int $user_id, array $post) 
+    {
+        $post['full_name'] = trim_space($post['full_name'], 0, 20);
+        $post['allow_notice'] = $post['allow_notice'] ? 1 : 0;
+
+        if (false === $this->getDb()->where(['id' => $user_id])->update([
+            'full_name' => $post['full_name'],
+            'allow_notice' => $post['allow_notice']
+        ])) {
+            return error('更新数据失败');
+        }
+
+        return success('ok');
+    }
+
+    /**
+     * 获取微信 openid
      * @return string
      */
     public function getWxOpenId (int $user_id, $type = 'mp')
@@ -196,7 +202,7 @@ class UserModel extends Crud {
         if (!$user_id) {
             return [];
         }
-        $field = $field ? $field : 'id,avatar,nick_name,full_name,idcard,telephone,group_id,status';
+        $field = $field ? $field : 'id,avatar,nick_name,full_name,idcard,telephone,group_id,allow_notice,status';
         if (!$userInfo = $this->find(is_array($user_id) ? $user_id : ['id' => $user_id], $field)) {
             return [];
         }

@@ -10,6 +10,23 @@ class GroupModel extends Crud {
     protected $table = 'admin_group';
 
     /**
+     * 事发地与单位的距离（km）
+     * @return array
+     * }
+     */
+    public function getDistance (int $id, $location)
+    {
+        if (!$location) {
+            return 0;
+        }
+        $groupData = $this->find(['id' => $id], 'location');
+        if (!$groupData['location']) {
+            return 0;
+        }
+        return round(LocationUtils::getDistance($location, $groupData['location']) / 1000);
+    }
+
+    /**
      * 移交部门人员
      * @return array
      * }

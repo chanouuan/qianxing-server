@@ -3,12 +3,6 @@
 namespace app\controllers;
 
 use ActionPDO;
-use app\models\UserModel;
-use app\models\ReportModel;
-use app\models\UserReportModel;
-use app\models\PropertyModel;
-use app\models\GroupModel;
-use app\models\TradeModel;
 
 /**
  * 小程序服务端接口
@@ -23,6 +17,7 @@ class Miniprogramserver extends ActionPDO {
             'login'               => ['interval' => 1000],
             'changePhone'         => ['interval' => 1000],
             'sendSms'             => ['interval' => 1000, 'rule' => '5|10|20'],
+            'saveUserInfo'        => ['interval' => 200],
             'getDistrictGroup'    => ['interval' => 1000],
             'reportEvent'         => ['interval' => 1000],
             'getUserReportEvents' => ['interval' => 200],
@@ -30,7 +25,6 @@ class Miniprogramserver extends ActionPDO {
             'acceptReport'        => ['interval' => 1000],
             'getReportDetail'     => ['interval' => 200],
             'reportInfo'          => ['interval' => 1000],
-            'reloadReport'        => ['interval' => 1000],
             'cardInfo'            => ['interval' => 1000],
             'searchPropertyItems' => ['interval' => 200],
             'reportItem'          => ['interval' => 1000],
@@ -42,7 +36,8 @@ class Miniprogramserver extends ActionPDO {
             'payQuery'            => ['interval' => 1000],
             'getGroupBook'        => ['interval' => 200],
             'trunReport'          => ['interval' => 1000],
-            'trunUserReport'      => ['interval' => 1000]
+            'trunUserReport'      => ['interval' => 1000],
+            'getUserCount'        => ['interval' => 1000]
         ];
     }
 
@@ -63,7 +58,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function upload () 
     {
-        return (new ReportModel($this->_G['user']['user_id']))->upload($_POST);
+        return (new \app\models\ReportModel($this->_G['user']['user_id']))->upload($_POST);
     }
 
     /**
@@ -103,7 +98,7 @@ class Miniprogramserver extends ActionPDO {
         }
         $reponse = $reponse['data'];
 
-        return (new UserModel())->mpLogin(array_merge($_POST, $reponse));
+        return (new \app\models\UserModel())->mpLogin(array_merge($_POST, $reponse));
     }
 
     /**
@@ -144,7 +139,37 @@ class Miniprogramserver extends ActionPDO {
             $_POST['msgcode'] = strval($_POST['msgcode']);
         }
 
-        return (new UserModel())->changePhone($this->_G['user']['user_id'], $_POST);
+        return (new \app\models\UserModel())->changePhone($this->_G['user']['user_id'], $_POST);
+    }
+
+    /**
+     * 获取用户信息数
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":[]
+     * }
+     */
+    public function getUserCount ()
+    {
+        return (new \app\models\UserCountModel())->loadInfo($this->_G['user']['user_id']);
+    }
+    
+    /**
+     * 更改用户信息
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":[]
+     * }
+     */
+    public function saveUserInfo () 
+    {
+        return (new \app\models\UserModel())->saveUserInfo($this->_G['user']['user_id'], $_POST);
     }
 
     /**
@@ -159,7 +184,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function sendSms () 
     {
-        return (new UserModel())->sendSmsCode($_POST);
+        return (new \app\models\UserModel())->sendSmsCode($_POST);
     }
     
     /**
@@ -174,7 +199,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function getDistrictGroup ()
     {
-        return (new GroupModel())->getDistrictGroup($_POST);
+        return (new \app\models\GroupModel())->getDistrictGroup($_POST);
     }
 
     /**
@@ -189,7 +214,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function reportEvent ()
     {
-        return (new UserReportModel())->reportEvent($this->_G['user']['user_id'], $_POST);
+        return (new \app\models\UserReportModel())->reportEvent($this->_G['user']['user_id'], $_POST);
     }
 
     /**
@@ -210,7 +235,7 @@ class Miniprogramserver extends ActionPDO {
     public function getUserReportEvents () 
     {
         $_POST['status'] = 0; // 只获取未受理
-        return (new UserReportModel())->getUserReportEvents($this->_G['user']['user_id'], $_POST);
+        return (new \app\models\UserReportModel())->getUserReportEvents($this->_G['user']['user_id'], $_POST);
     }
 
     /**
@@ -230,7 +255,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function getReportEvents () 
     {
-        return (new ReportModel())->getReportEvents($this->_G['user']['user_id'], $_POST);
+        return (new \app\models\ReportModel())->getReportEvents($this->_G['user']['user_id'], $_POST);
     }
 
     /**
@@ -245,7 +270,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function getReportDetail ()
     {
-        return (new ReportModel($this->_G['user']['user_id']))->getReportDetail($_POST);
+        return (new \app\models\ReportModel($this->_G['user']['user_id']))->getReportDetail($_POST);
     }
 
     /**
@@ -260,7 +285,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function acceptReport ()
     {
-        return (new ReportModel($this->_G['user']['user_id']))->acceptReport($_POST);
+        return (new \app\models\ReportModel($this->_G['user']['user_id']))->acceptReport($_POST);
     }
 
     /**
@@ -275,22 +300,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function reportInfo ()
     {
-        return (new ReportModel($this->_G['user']['user_id']))->reportInfo($_POST);
-    }
-
-    /**
-     * 案件处置
-     * @login
-     * @return array
-     * {
-     * "errorcode":0,
-     * "message":"",
-     * "data":[]
-     * }
-     */
-    public function reloadReport ()
-    {
-        return (new ReportModel($this->_G['user']['user_id']))->reloadReport($_POST);
+        return (new \app\models\ReportModel($this->_G['user']['user_id']))->reportInfo($_POST);
     }
 
     /**
@@ -305,7 +315,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function getColleague ()
     {
-        return (new UserModel())->getColleague($this->_G['user']['user_id']);
+        return (new \app\models\UserModel())->getColleague($this->_G['user']['user_id']);
     }
 
     /**
@@ -320,7 +330,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function cardInfo ()
     {
-        return (new ReportModel($this->_G['user']['user_id']))->cardInfo($_POST);
+        return (new \app\models\ReportModel($this->_G['user']['user_id']))->cardInfo($_POST);
     }
 
     /**
@@ -334,7 +344,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function searchPropertyItems ()
     {
-        return (new PropertyModel())->search($_POST);
+        return (new \app\models\PropertyModel())->search($_POST);
     }
 
     /**
@@ -349,7 +359,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function reportItem ()
     {
-        return (new ReportModel($this->_G['user']['user_id']))->reportItem($_POST);
+        return (new \app\models\ReportModel($this->_G['user']['user_id']))->reportItem($_POST);
     }
 
     /**
@@ -364,7 +374,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function reportFile ()
     {
-        return (new ReportModel($this->_G['user']['user_id']))->reportFile($_POST);
+        return (new \app\models\ReportModel($this->_G['user']['user_id']))->reportFile($_POST);
     }
 
     /**
@@ -379,7 +389,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function cancelReport ()
     {
-        return (new ReportModel($this->_G['user']['user_id']))->cancelReport($_POST);
+        return (new \app\models\ReportModel($this->_G['user']['user_id']))->cancelReport($_POST);
     }
 
     /**
@@ -394,7 +404,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function deleteReport ()
     {
-        return (new UserReportModel())->deleteReport($this->_G['user']['user_id'], $_POST);
+        return (new \app\models\UserReportModel())->deleteReport($this->_G['user']['user_id'], $_POST);
     }
 
     /**
@@ -409,7 +419,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function getPropertyPayItems ()
     {
-        return (new ReportModel())->getPropertyPayItems($this->_G['user']['user_id'], $_POST);
+        return (new \app\models\ReportModel())->getPropertyPayItems($this->_G['user']['user_id'], $_POST);
     }
 
     /**
@@ -425,7 +435,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function createPay ()
     {
-        return (new TradeModel())->createPay($this->_G['user']['user_id'], $_POST);
+        return (new \app\models\TradeModel())->createPay($this->_G['user']['user_id'], $_POST);
     }
 
     /**
@@ -440,7 +450,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function payQuery ()
     {
-        return (new TradeModel())->payQuery($this->_G['user']['user_id'], $_POST);
+        return (new \app\models\TradeModel())->payQuery($this->_G['user']['user_id'], $_POST);
     }
 
     /**
@@ -455,7 +465,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function getGroupBook ()
     {
-        return (new GroupModel())->getGroupBook($this->_G['user']['user_id'], $_POST);
+        return (new \app\models\GroupModel())->getGroupBook($this->_G['user']['user_id'], $_POST);
     }
 
     /**
@@ -470,7 +480,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function trunUserReport ()
     {
-        return (new UserReportModel())->trunUserReport($this->_G['user']['user_id'], $_POST);
+        return (new \app\models\UserReportModel())->trunUserReport($this->_G['user']['user_id'], $_POST);
     }
 
     /**
@@ -485,7 +495,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function trunReport ()
     {
-        return (new ReportModel($this->_G['user']['user_id']))->trunReport($_POST);
+        return (new \app\models\ReportModel($this->_G['user']['user_id']))->trunReport($_POST);
     }
     
 

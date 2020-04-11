@@ -62,6 +62,9 @@ class ReportModel extends Crud {
             return error('数据更新失败');
         }
 
+        // 更新统计数
+        (new UserCountModel())->setReportCount('old', null, $post['target_id'], null, $this->userInfo['id']);
+
         // todo 通知移交人
 
         return success('ok');
@@ -138,7 +141,7 @@ class ReportModel extends Crud {
     {
         $post['report_id'] = intval($post['report_id']);
 
-        if (!$reportInfo = $this->find(['id' => $post['report_id'], 'law_id' => $this->userInfo['id'], 'status' => ReportStatus::ACCEPT], 'id,user_id')) {
+        if (!$reportData = $this->find(['id' => $post['report_id'], 'law_id' => $this->userInfo['id'], 'status' => ReportStatus::ACCEPT], 'id,colleague_id,location,user_id')) {
             return error('案件未找到');
         }
 
@@ -149,6 +152,15 @@ class ReportModel extends Crud {
         ])) {
             return error('数据保存失败');
         }
+
+        // 更新统计数
+        $userCountModel = new UserCountModel();
+        $userCountModel->updateSet([$this->userInfo['id'], $reportData['colleague_id']], [
+            'case_count' => ['case_count+1'],
+            'patrol_km' => ['patrol_km+' . (new GroupModel())->getDistance($this->userInfo['group_id'], $reportData['location'])]
+        ]);
+        $userCountModel->updateCityRank([$this->userInfo['id'], $reportData['colleague_id']], $this->userInfo['group_id']);
+        $userCountModel->setReportCount('complete', null, $this->userInfo['id']);
 
         // todo 通知用户
         return success('ok');
@@ -405,7 +417,7 @@ class ReportModel extends Crud {
     }
 
     /**
-     * 审理案件
+     * 受理案件
      * @return array
      */
     public function acceptReport (array $post)
@@ -450,6 +462,9 @@ class ReportModel extends Crud {
         })) {
             return error('案件保存失败');
         }
+
+        // 更新统计数
+        (new UserCountModel())->setReportCount('accept', $this->userInfo['group_id'], $this->userInfo['id']);
 
         return success(['report_id' => $report_id]);
     }
@@ -554,31 +569,6 @@ class ReportModel extends Crud {
         }
 
         return success($reportInfo);
-    }
-
-    /**
-     * 案件处置
-     * @return array
-     */
-    public function reloadReport (array $post)
-    {
-        $post['order_id'] = intval($post['order_id']);
-        if (!$orderInfo = $this->find(['id' => $post['order_id']], 'id,user_id,law_id,status')) {
-            return error('报案记录不存在');
-        }
-        if ($orderInfo['law_id'] != $user_id) {
-            return error('你不是该案件的执法人');
-        }
-        if ($orderInfo['status'] != ReportStatus::ACCEPT) {
-            return error('该案件尚未受理');
-        }
-
-        if ($post['data_source'] == 'info') {
-            // 报送信息
-            return $this->reportInfo($this->userInfo, $post);
-        }
-
-        return success('ok');
     }
 
     /**
@@ -705,9 +695,7 @@ class ReportModel extends Crud {
 
         // 重新关联当事人，当事人通过 user_mobile 才能获取到订单
         $userModel = new UserModel();
-        if (false === ($userInfo = $userModel->getUserInfo(['telephone' => $post['telephone']], 'id'))) {
-            return error('查询错误');
-        }
+        $userInfo = $userModel->find(['telephone' => $post['telephone']], 'id');
 
         if (!$this->getDb()->transaction(function ($db) use ($post, $userInfo) {
             if (false === $this->getDb()->where(['id' => $post['report_id'], 'law_id' => $this->userInfo['id']])->update([
@@ -763,6 +751,9 @@ class ReportModel extends Crud {
         ])) {
             return error('数据更新失败');
         }
+
+        // 更新统计数
+        (new UserCountModel())->setReportCount('complete', null, $this->userInfo['id']);
 
         return success('ok');
     }
