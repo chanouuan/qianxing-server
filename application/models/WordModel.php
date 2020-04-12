@@ -33,68 +33,108 @@ class WordModel extends Crud {
      */
     public function getReportData (array $condition)
     {
-        if (!$reportInfo = $this->getDb()->table('qianxing_report')->field('id,group_id,location,address,user_id,user_mobile,law_id,colleague_id,stake_number,pay,status,create_time')->where($condition)->limit(1)->find()) {
+        if (!$reportData = $this->getDb()->table('qianxing_report')->where($condition)->limit(1)->find()) {
             return [];
         }
 
-        $reportInfo['pay'] = round_dollar($reportInfo['pay']);
+        $groupModel = new GroupModel();
+        $adminModel = new AdminModel();
+        $userModel = new UserModel();
+
+        $reportData['pay'] = round_dollar($reportData['pay']);
+        $reportData['dollar'] = conver_chinese_dollar($reportData['pay']);
+        $reportData += $this->getSplitDate('handle_time', $reportData['handle_time']);
+        $reportData += $this->getSplitDate('create_time', $reportData['create_time']);
+        unset($reportData['handle_time'], $reportData['report_time'], $reportData['create_time'], $reportData['update_time']);
 
         // 获取单位
-        $groupInfo = (new GroupModel())->find(['id' => $reportInfo['group_id']], 'name');
-        $reportInfo['group_name'] = $groupInfo['name'];
+        $groupInfo = $groupModel->find(['id' => $reportData['group_id']], 'parent_id,name,address,phone,way_name');
+        $reportData['group_name'] = $groupInfo['name'];
+        $reportData['group_address'] = $groupInfo['address'];
+        $reportData['group_phone'] = $groupInfo['phone'];
+        $reportData['way_name'] = $groupInfo['way_name'];
+        $groupInfo = $groupModel->find(['id' => $groupInfo['parent_id']], 'name');
+        $reportData['group_root_name'] = $groupInfo['name'];
 
-        $reportInfo += $this->getDb()->table('qianxing_report_info')->where(['id' => $reportInfo['id']])->limit(1)->find();
+        $reportData += $this->getDb()->table('qianxing_report_info')->where(['id' => $reportData['id']])->limit(1)->find();
+
+        $reportData['gender'] = Gender::getMessage($reportData['gender']);
 
         // 路产受损赔付清单
-        $reportInfo['items'] = $this->getDb()->field('name,unit,price,amount,total_money')->table('qianxing_report_item')->where(['report_id' => $reportInfo['id']])->select();
-        $reportInfo['items_content'] = $this->getBRline($reportInfo['items']);
-        unset($reportInfo['items']);
+        $reportData['items'] = $this->getDb()->field('name,unit,price,amount,total_money')->table('qianxing_report_item')->where(['report_id' => $reportData['id']])->select();
+        $reportData['items_content'] = $this->getBRline($reportData['items']);
+        unset($reportData['items']);
 
         // 获取勘验人和记录人的执法证号
-        $lawNums = (new AdminModel())->getLawNumByUser([$reportInfo['law_id'], $reportInfo['colleague_id']]);
-        $reportInfo['law_lawnum'] = strval($lawNums[$reportInfo['law_id']]);
-        $reportInfo['colleague_lawnum'] = strval($lawNums[$reportInfo['colleague_id']]);
+        $lawNums = $adminModel->getLawNumByUser([$reportData['law_id'], $reportData['colleague_id']]);
+        $reportData['law_lawnum'] = strval($lawNums[$reportData['law_id']]);
+        $reportData['colleague_lawnum'] = strval($lawNums[$reportData['colleague_id']]);
         // 获取勘验人和记录人的姓名
-        $userNames = (new UserModel())->getUserNames([$reportInfo['law_id'], $reportInfo['colleague_id']]);
-        $reportInfo['law_name'] = strval($userNames[$reportInfo['law_id']]);
-        $reportInfo['colleague_name'] = strval($userNames[$reportInfo['colleague_id']]);
+        $userNames = $userModel->getUserNames([$reportData['law_id'], $reportData['colleague_id']]);
+        $reportData['law_name'] = strval($userNames[$reportData['law_id']]);
+        $reportData['colleague_name'] = strval($userNames[$reportData['colleague_id']]);
         
-        $reportInfo += $this->getSplitDate('event_time', $reportInfo['event_time']);
-        $reportInfo += $this->getSplitDate('check_start_time', $reportInfo['check_start_time']);
-        $reportInfo += $this->getSplitDate('check_end_time', $reportInfo['check_end_time']);
-        $reportInfo += $this->getSplitDate('current_date', date('Y-m-d H:i:s', TIMESTAMP));
-        $reportInfo += $this->getSplitCheckBox('involved_action', $reportInfo['involved_action'], ['a', 'b', 'c', 'c1', 'c2', 'c3', 'c4', 'd', 'e']);
-        $reportInfo += $this->getSplitCheckBox('involved_action_type', $reportInfo['involved_action_type'], ['a', 'b', 'c']);
-        unset($reportInfo['event_time'], $reportInfo['check_start_time'], $reportInfo['check_end_time'], $reportInfo['involved_action'], $reportInfo['involved_action_type']);
+        $reportData += $this->getSplitDate('event_time', $reportData['event_time']);
+        $reportData += $this->getSplitDate('check_start_time', $reportData['check_start_time']);
+        $reportData += $this->getSplitDate('check_end_time', $reportData['check_end_time']);
+        $reportData += $this->getSplitDate('current_date', date('Y-m-d H:i:s', TIMESTAMP));
+        $reportData += $this->getSplitCheckBox('involved_action', $reportData['involved_action'], ['a', 'b', 'c', 'c1', 'c2', 'c3', 'c4', 'd', 'e']);
+        $reportData += $this->getSplitCheckBox('involved_action_type', $reportData['involved_action_type'], ['a', 'b', 'c']);
+        $reportData += $this->getSplitCheckBoxIf($reportData);
+        unset($reportData['event_time'], $reportData['check_start_time'], $reportData['check_end_time'], $reportData['involved_action'], $reportData['involved_action_type']);
 
-        $reportInfo['weather'] = Weather::getMessage($reportInfo['weather']);
-        $reportInfo['car_type'] = CarType::getMessage($reportInfo['car_type']);
+        $reportData['weather'] = Weather::getMessage($reportData['weather']);
+        $reportData['car_type'] = CarType::getMessage($reportData['car_type']);
 
-        $reportInfo['idcard_front'] = $this->getSplitLocalImage($reportInfo['idcard_front']);
-        $reportInfo['idcard_behind'] = $this->getSplitLocalImage($reportInfo['idcard_behind']);
-        $reportInfo['driver_license_front'] = $this->getSplitLocalImage($reportInfo['driver_license_front']);
-        $reportInfo['driver_license_behind'] = $this->getSplitLocalImage($reportInfo['driver_license_behind']);
-        $reportInfo['driving_license_front'] = $this->getSplitLocalImage($reportInfo['driving_license_front']);
-        $reportInfo['driving_license_behind'] = $this->getSplitLocalImage($reportInfo['driving_license_behind']);
-        $reportInfo['signature_checker'] = $this->getSplitLocalImage($reportInfo['signature_checker']);
-        $reportInfo['signature_writer'] = $this->getSplitLocalImage($reportInfo['signature_writer']);
-        $reportInfo['signature_agent'] = $this->getSplitLocalImage($reportInfo['signature_agent']);
-        $reportInfo['signature_invitee'] = $this->getSplitLocalImage($reportInfo['signature_invitee']);
-        $reportInfo += $this->getSplitPhoto($reportInfo['site_photos']);
-        unset($reportInfo['site_photos']);
+        $reportData['idcard_front'] = $this->getSplitLocalImage($reportData['idcard_front']);
+        $reportData['idcard_behind'] = $this->getSplitLocalImage($reportData['idcard_behind']);
+        $reportData['driver_license_front'] = $this->getSplitLocalImage($reportData['driver_license_front']);
+        $reportData['driver_license_behind'] = $this->getSplitLocalImage($reportData['driver_license_behind']);
+        $reportData['driving_license_front'] = $this->getSplitLocalImage($reportData['driving_license_front']);
+        $reportData['driving_license_behind'] = $this->getSplitLocalImage($reportData['driving_license_behind']);
+        $reportData['signature_checker'] = $this->getSplitLocalImage($reportData['signature_checker']);
+        $reportData['signature_writer'] = $this->getSplitLocalImage($reportData['signature_writer']);
+        $reportData['signature_agent'] = $this->getSplitLocalImage($reportData['signature_agent']);
+        $reportData['signature_invitee'] = $this->getSplitLocalImage($reportData['signature_invitee']);
+        $reportData += $this->getSplitPhoto($reportData['site_photos']);
+        unset($reportData['site_photos']);
         
         // 分离出图片
         $images = [];
-        foreach ($reportInfo as $k => $v) {
+        foreach ($reportData as $k => $v) {
             if (is_array($v)) {
                 $images[$k] = $v;
-                unset($reportInfo[$k]);
+                unset($reportData[$k]);
             }
         }
 
+        // 获取赔付项目
+        $items = $this->getDb()->table('qianxing_report_item')->field('name,unit,price,amount,total_money')->where(['report_id' => $reportData['id']])->select();
+        $rows = [];
+        if ($items) {
+            $items = array_pad($items, 19, []); // 补齐行数
+            foreach ($items as $k => $v) {
+                $rows['items'][$k]['item.index'] = $k + 1;
+                $rows['items'][$k]['item.name'] = isset($v['name']) ? $v['name'] : '';
+                $rows['items'][$k]['item.unit'] = isset($v['unit']) ? $v['unit'] : '';
+                $rows['items'][$k]['item.amount'] = isset($v['amount']) ? $v['amount'] : '';
+                $rows['items'][$k]['item.price'] = isset($v['price']) ? round_dollar($v['price']) : '';
+                $rows['items'][$k]['item.total_money'] = isset($v['total_money']) ? round_dollar($v['total_money']) : '';
+            }
+            unset($items);
+        } else {
+            $reportData['item.index'] = '';
+            $reportData['item.name'] = '';
+            $reportData['item.unit'] = '';
+            $reportData['item.amount'] = '';
+            $reportData['item.price'] = '';
+            $reportData['item.total_money'] = '';
+        }
+
         return [
-            'values' => $reportInfo,
-            'images' => $images
+            'values' => $reportData,
+            'images' => $images,
+            'rows' => $rows
         ];
     }
 
@@ -141,6 +181,31 @@ class WordModel extends Crud {
         $result = mb_str_split($result, 1);
         $result = array_pad($result, 100, ''); // 填充占位符
         return implode('', $result);
+    }
+
+    private function getSplitCheckBoxIf ($data)
+    {
+        return [
+            'involved_action.a.a' => $data['involved_action.a'] == '☑' && $data['involved_action_type.a'] == '☑' ? '☑' : '☐',
+            'involved_action.a.b' => $data['involved_action.a'] == '☑' && $data['involved_action_type.b'] == '☑' ? '☑' : '☐',
+            'involved_action.a.c' => $data['involved_action.a'] == '☑' && $data['involved_action_type.c'] == '☑' ? '☑' : '☐',
+
+            'involved_action.b.a' => $data['involved_action.b'] == '☑' && $data['involved_action_type.a'] == '☑' ? '☑' : '☐',
+            'involved_action.b.b' => $data['involved_action.b'] == '☑' && $data['involved_action_type.b'] == '☑' ? '☑' : '☐',
+            'involved_action.b.c' => $data['involved_action.b'] == '☑' && $data['involved_action_type.c'] == '☑' ? '☑' : '☐',
+
+            'involved_action.c.a' => $data['involved_action.c'] == '☑' && $data['involved_action_type.a'] == '☑' ? '☑' : '☐',
+            'involved_action.c.b' => $data['involved_action.c'] == '☑' && $data['involved_action_type.b'] == '☑' ? '☑' : '☐',
+            'involved_action.c.c' => $data['involved_action.c'] == '☑' && $data['involved_action_type.c'] == '☑' ? '☑' : '☐',
+
+            'involved_action.d.a' => $data['involved_action.d'] == '☑' && $data['involved_action_type.a'] == '☑' ? '☑' : '☐',
+            'involved_action.d.b' => $data['involved_action.d'] == '☑' && $data['involved_action_type.b'] == '☑' ? '☑' : '☐',
+            'involved_action.d.c' => $data['involved_action.d'] == '☑' && $data['involved_action_type.c'] == '☑' ? '☑' : '☐',
+
+            'involved_action.e.a' => $data['involved_action.e'] == '☑' && $data['involved_action_type.a'] == '☑' ? '☑' : '☐',
+            'involved_action.e.b' => $data['involved_action.e'] == '☑' && $data['involved_action_type.b'] == '☑' ? '☑' : '☐',
+            'involved_action.e.c' => $data['involved_action.e'] == '☑' && $data['involved_action_type.c'] == '☑' ? '☑' : '☐'
+        ];
     }
 
     private function getSplitCheckBox ($lit, $data, array $target = [])

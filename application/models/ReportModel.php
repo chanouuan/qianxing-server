@@ -758,4 +758,32 @@ class ReportModel extends Crud {
         return success('ok');
     }
 
+    /**
+     * 发送小程序订阅消息
+     * @return array
+     */
+    public function sendSubscribeMessage ($user_id, $template_name, $page, array $value)
+    {
+        if (!$openid = (new UserModel())->getWxOpenId($user_id, 'mp')) {
+            return error('openid为空');
+        }
+        $wxConfig = getSysConfig('qianxing', 'wx');
+        if (!isset($wxConfig['template_id'][$template_name]) ||
+            !$wxConfig['template_id'][$template_name]['id']  ||
+            !$wxConfig['template_id'][$template_name]['data']) {
+            return error('模板消息参数为空');
+        }
+        $jssdk = new \app\library\JSSDK($wxConfig['appid'], $wxConfig['appsecret']);
+        $data = $wxConfig['template_id'][$template_name]['data'];
+        foreach ($data as $k => $v) {
+            $data[$k]['value'] = template_replace($v['value'], $value);
+        }
+        return $jssdk->sendMiniprogramSubscribeMessage([
+            'openid' => $openid,
+            'template_id' => $wxConfig['template_id'][$template_name]['id'],
+            'page' => $page,
+            'data' => $data
+        ]);
+    }
+
 }

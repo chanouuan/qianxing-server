@@ -48,7 +48,11 @@ class Word extends ActionPDO {
 
         $templateProcessor->setValues($data['values']);
         if ($data['images']) {
+            $data['images']['signature_agent']['height'] = 40;
             $templateProcessor->setImageValue(array_keys($data['images']), $data['images']);
+        }
+        if ($data['rows']['items']) {
+            $templateProcessor->cloneRowAndSetValues('item.index', $data['rows']['items']);
         }
 
         mkdirm(dirname(APPLICATION_PATH . '/public/' . $templateSaveAs));
@@ -96,9 +100,12 @@ class Word extends ActionPDO {
     private function viewKeys ($data)
     {
         // print_r($templateProcessor->getVariables());
-        $keys = array_keys($data);
-        $keys = '${' . implode("}\r\n\${", $keys) . '}';
-        exit($keys);
+        $result = [];
+        foreach ($data as $k => $v) {
+            $result[] = '${' . $k . '} = ' . (is_array($v) ? json_encode($v) : $v);
+        }
+        $result = implode("\r\n", $result);
+        exit($result);
     }
 
 }

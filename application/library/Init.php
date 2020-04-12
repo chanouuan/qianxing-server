@@ -1181,7 +1181,7 @@ class StatusCodes {
         3005 => '请求方法错误',
         3010 => '用户未登录',
         4001 => '访问次数过多',
-        4002 => '你已提交请求'
+        4002 => '提交太频繁，请稍后再试'
     ];
 
     public static function getMessage($code)

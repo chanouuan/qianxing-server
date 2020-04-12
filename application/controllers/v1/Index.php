@@ -26,6 +26,13 @@ class Index extends ActionPDO {
         }
     }
 
+    public function testmsg ()
+    {
+        print_r((new \app\models\ReportModel())->sendSubscribeMessage(1,'event_notice','/pages/index/index',[
+                '111','2020-4-5','333'
+            ]));
+    }
+
     public function test ()
     {
         $templateProcessor = new \PhpOffice\PhpWord\TemplateProcessor('./header-footer.docx');

@@ -132,7 +132,7 @@ class UserModel extends Crud {
             // 手机号已被注册
             if (!$this->getDb()->transaction(function ($db) use ($post, $userInfo, $user_id, $updateParams) {
                 // 更新占号用户手机号
-                if (!$db->where(['id' => $userInfo['id']])->update([
+                if (!$this->getDb()->where(['id' => $userInfo['id']])->update([
                     'telephone' => null,
                     'group_id' => 0,
                     'description' => '解绑手机号' . $post['telephone'] . '到用户' . $user_id, 
@@ -141,7 +141,7 @@ class UserModel extends Crud {
                     return false;
                 }
                 // 更新当前用户手机号
-                if (!$db->where(['id' => $user_id])->update($updateParams)) {
+                if (!$this->getDb()->where(['id' => $user_id])->update($updateParams)) {
                     return false;
                 }
                 return true;

@@ -18,6 +18,38 @@ class JSSDK {
     }
 
     /**
+     * 发送小程序订阅消息
+     */
+    public function sendMiniprogramSubscribeMessage (array $info)
+    {
+        $wxcontent = [];
+        $wxcontent['touser'] = $info['openid'];
+        $wxcontent['template_id'] = $info['template_id'];
+        if ($info['page']) {
+            $wxcontent['page'] = $info['page'];
+        }
+        $wxcontent['data'] = $info['data'];
+        $wxcontent['miniprogram_state'] = 'developer'; // 跳转小程序类型：developer为开发版；trial为体验版；formal为正式版；默认为正式版
+        $accessToken = $this->getAccessToken();
+        if ($accessToken['errorcode'] !== 0) {
+            return $accessToken;
+        }
+        $accessToken = $accessToken['data']['access_token'];
+        try {
+            $result = https_request([
+                'url' => 'https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token=' . $accessToken,
+                'post' => json_encode($wxcontent)
+            ]);
+        } catch (\Exception $e) {
+            return error($e->getMessage());
+        }
+        if ($result['data']['errcode']) {
+            return error($result['data']['errmsg']);
+        }
+        return success('OK');
+    }
+
+    /**
      * 获取小程序模板消息
      */
     public function getMiniprogramTemplateList ()
@@ -357,12 +389,15 @@ class JSSDK {
     {
         if ($this->accessTokenUrl) {
             try {
-                $reponse = https_request($this->accessTokenUrl, null, null, 4, null);
+                $reponse = https_request([
+                    'url' => $this->accessTokenUrl,
+                    'encode' => 'string'
+                ]);
             } catch (\Exception $e) {
                 return error($e->getMessage());
             }
             return success(array(
-                'access_token' => $reponse
+                'access_token' => $reponse['data']
             ));
         }
 
@@ -370,22 +405,24 @@ class JSSDK {
 
         if (!$data) {
             try {
-                $reponse = https_request("https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=$this->appId&secret=$this->appSecret");
+                $reponse = https_request([
+                    'url' => 'https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=' . $this->appId . '&secret=' . $this->appSecret
+                ]);
             } catch (\Exception $e) {
                 return error($e->getMessage());
             }
-            if ($reponse['errcode']) {
-                return error($reponse['errmsg']);
+            if ($reponse['data']['errcode']) {
+                return error($reponse['data']['errmsg']);
             }
-            Cache::getInstance(['type' => 'file'])->set('access_token' . $this->appId, $reponse['access_token'], $reponse['expires_in'] - 100);
+            Cache::getInstance(['type' => 'file'])->set('access_token' . $this->appId, $reponse['data']['access_token'], $reponse['data']['expires_in'] - 100);
 
             return success(array(
-                'access_token' => $reponse['access_token']
+                'access_token' => $reponse['data']['access_token']
             ));
         }
 
         return success(array(
-                'access_token' => $data
+            'access_token' => $data
         ));
     }
 

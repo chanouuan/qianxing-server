@@ -43,7 +43,7 @@ class Miniprogramserver extends ActionPDO {
 
     public function _init()
     {
-        
+
     }
 
     /**
