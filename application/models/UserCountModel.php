@@ -60,10 +60,10 @@ class UserCountModel extends Crud {
      * 获取用户信息数
      * @return array
      */
-    public function loadInfo (int $user_id)
+    public function loadInfo (int $user_id, $field = null)
     {
-        $info = $this->find(['id' => $user_id]);
-        return success($info);
+        $info = $this->find(['id' => $user_id], $field);
+        return $info;
     }
 
     /**

@@ -47,6 +47,26 @@ class Miniprogramserver extends ActionPDO {
     }
 
     /**
+     * 首页加载
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":[]
+     * }
+     */
+    public function loadData ()
+    {
+        $banner = (new \app\models\BannerModel())->getBanner();
+        $usercount = (new \app\models\UserCountModel())->loadInfo($this->_G['user']['user_id'], 'report_count');
+        return success([
+            'banner' => $banner,
+            'report_count' => $usercount['report_count']
+        ]);
+    }
+
+    /**
      * 上传文件
      * @login
      * @return array
@@ -154,7 +174,7 @@ class Miniprogramserver extends ActionPDO {
      */
     public function getUserCount ()
     {
-        return (new \app\models\UserCountModel())->loadInfo($this->_G['user']['user_id']);
+        return success((new \app\models\UserCountModel())->loadInfo($this->_G['user']['user_id']));
     }
     
     /**
@@ -363,7 +383,7 @@ class Miniprogramserver extends ActionPDO {
     }
 
     /**
-     * 下发赔偿通知书
+     * 转发赔偿通知书
      * @login
      * @return array
      * {

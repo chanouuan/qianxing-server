@@ -314,27 +314,6 @@ class UserModel extends Crud {
     }
 
     /**
-     * hash密码
-     * @param $pwd
-     * @return string
-     */
-    public function hashPassword ($pwd)
-    {
-        return password_hash($pwd, PASSWORD_BCRYPT);
-    }
-
-    /**
-     * 密码hash验证
-     * @param $pwd 密码明文
-     * @param $hash hash密码
-     * @return bool
-     */
-    public function passwordVerify ($pwd, $hash)
-    {
-        return password_verify($pwd, $hash);
-    }
-
-    /**
      * 验证图片验证码
      * @return bool
      */

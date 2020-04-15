@@ -76,13 +76,13 @@ class ReportModel extends Crud {
      */
     public function createPay (int $user_id, array $post)
     {
-        if (!$reportInfo = $this->find(['id' => $post['order_id'], 'user_id' => $user_id, 'status' => ReportStatus::HANDLED], 'id,pay,law_id')) {
+        if (!$reportData = $this->find(['id' => $post['order_id'], 'user_id' => $user_id, 'status' => ReportStatus::HANDLED], 'id,total_money,pay,cash')) {
             return error('案件未找到');
         }
 
         return success([
-            'pay' => $reportInfo['pay'],
-            'money' => $reportInfo['pay']
+            'pay' => $reportData['total_money'] - $reportData['pay'] - $reportData['cash'],
+            'money' => $reportData['total_money']
         ]);
     }
 
@@ -93,8 +93,10 @@ class ReportModel extends Crud {
     public function paySuccess (array $trade)
     {
         if (!$this->getDb()->where(['id' => $trade['order_id'], 'status' => ReportStatus::HANDLED])->update([
-            'status' => ReportStatus::COMPLETE,
-            'update_time' => date('Y-m-d H:i:s', TIMESTAMP)
+            'status' => ['if(pay+cash+'.$trade['pay'].'=total_money,'.ReportStatus::COMPLETE.',status)'],
+            'pay' => ['if(pay+cash+'.$trade['pay'].'>total_money,pay,pay+'.$trade['pay'].')'],
+            'update_time' => date('Y-m-d H:i:s', TIMESTAMP),
+            'complete_time' => date('Y-m-d H:i:s', TIMESTAMP)
         ])) {
             return false;
         }
@@ -107,6 +109,10 @@ class ReportModel extends Crud {
      */
     public function payComplete (array $trade)
     {
+        if (!$reportData = $this->find(['id' => $post['order_id']], 'id,user_id,law_id,status')) {
+            return false;
+        }
+
         // todo 通知路政执法人员
     }
 
@@ -118,30 +124,50 @@ class ReportModel extends Crud {
     {
         $post['report_id'] = intval($post['report_id']);
 
-        if (!$this->count(['id' => $post['report_id'], 'user_id' => $user_id])) {
+        if (!$reportData = $this->find(['id' => $post['report_id'], 'user_id' => $user_id], 'id,total_money,pay,cash')) {
             return error('案件未找到');
         }
 
-        if (!$list = $this->getDb()->field('id,name,unit,amount,total_money')->table('qianxing_report_item')->where(['report_id' => $post['report_id']])->select()) {
-            return success([]);
+        if (!$list = $this->getDb()->field('id,name,unit,amount,total_money')->table('qianxing_report_item')->where(['report_id' => $reportData['id']])->select()) {
+            return success([
+                'items' => [],
+                'total_money' => round_dollar($reportData['total_money']),
+                'pay' => round_dollar($reportData['pay']),
+                'cash' => round_dollar($reportData['cash'])
+            ]);
         }
 
         foreach ($list as $k => $v) {
             $list[$k]['total_money'] = round_dollar($v['total_money']);
         }
 
-        return success($list); 
+        return success([
+            'items' => $list,
+            'total_money' => round_dollar($reportData['total_money']),
+            'pay' => round_dollar($reportData['pay']),
+            'cash' => round_dollar($reportData['cash'])
+        ]);
     }
 
     /**
-     * 下发赔偿通知书
+     * 转发赔偿通知书
      * @return array
      */
-    public function reportFile (array $post)
+    public function reportFile (array $post, array $adminCondition = [])
     {
         $post['report_id'] = intval($post['report_id']);
 
-        if (!$reportData = $this->find(['id' => $post['report_id'], 'law_id' => $this->userInfo['id'], 'status' => ReportStatus::ACCEPT], 'id,colleague_id,location,user_id')) {
+        $condition = [
+            'id' => $post['report_id'], 
+            'status' => ReportStatus::ACCEPT
+        ];
+        if (empty($adminCondition)) {
+            $condition['law_id'] = $this->userInfo['id'];
+        } else {
+            $condition += $adminCondition;
+        }
+
+        if (!$reportData = $this->find($condition, 'id,group_id,law_id,colleague_id,location,user_id')) {
             return error('案件未找到');
         }
 
@@ -155,12 +181,12 @@ class ReportModel extends Crud {
 
         // 更新统计数
         $userCountModel = new UserCountModel();
-        $userCountModel->updateSet([$this->userInfo['id'], $reportData['colleague_id']], [
+        $userCountModel->updateSet([$reportData['law_id'], $reportData['colleague_id']], [
             'case_count' => ['case_count+1'],
-            'patrol_km' => ['patrol_km+' . (new GroupModel())->getDistance($this->userInfo['group_id'], $reportData['location'])]
+            'patrol_km' => ['patrol_km+' . (new GroupModel())->getDistance($reportData['group_id'], $reportData['location'])]
         ]);
-        $userCountModel->updateCityRank([$this->userInfo['id'], $reportData['colleague_id']], $this->userInfo['group_id']);
-        $userCountModel->setReportCount('complete', null, $this->userInfo['id']);
+        $userCountModel->updateCityRank([$reportData['law_id'], $reportData['colleague_id']], $reportData['group_id']);
+        $userCountModel->setReportCount('complete', null, $reportData['law_id']);
 
         // todo 通知用户
         return success('ok');
@@ -217,8 +243,9 @@ class ReportModel extends Crud {
         }
 
         if (!$this->getDb()->transaction(function ($db) use ($post, $items) {
+            // 更新赔付金额
             if (!$this->getDb()->where(['id' => $post['report_id'], 'status' => ReportStatus::ACCEPT])->update([
-                'pay' => array_sum(array_column($items, 'total_money')), // 更新赔付金额
+                'total_money' => array_sum(array_column($items, 'total_money')),
                 'update_time' => date('Y-m-d H:i:s', TIMESTAMP)
             ])) {
                 return false;
@@ -313,7 +340,7 @@ class ReportModel extends Crud {
             $post['report_field'] === 'signature_invitee'
             ) ? 90 : 0;
 
-        $uploadfile = uploadfile($_FILES['upfile'], 'jpg,jpeg,png', 0, 0, $rotate);
+        $uploadfile = uploadfile($_FILES['upfile'], 'jpg,jpeg,png', $rotate ? 0 : 800, 0, $rotate);
         if ($uploadfile['errorcode'] !== 0) {
             return $uploadfile;
         }
@@ -322,13 +349,13 @@ class ReportModel extends Crud {
         if ($post['report_field'] == 'site_photos') {
             // 现场图照
             $reportInfo['site_photos'] = $reportInfo['site_photos'] ? json_decode($reportInfo['site_photos'], true) : [['src' => ''],['src' => ''],['src' => ''],['src' => ''],['src' => '']];
-            $reportInfo['site_photos'][$post['report_field_index']]['src'] = $uploadfile['url'];
+            $reportInfo['site_photos'][$post['report_field_index']]['src'] = $uploadfile['thumburl'] ? $uploadfile['thumburl'] : $uploadfile['url'];
             $update = [
                 'site_photos' => json_encode($reportInfo['site_photos'])
             ];
         } else {
             $update = [
-                $post['report_field'] => $uploadfile['url']
+                $post['report_field'] => $uploadfile['thumburl'] ? $uploadfile['thumburl'] : $uploadfile['url']
             ];
         }
 
@@ -388,7 +415,7 @@ class ReportModel extends Crud {
             return success($result);
         }
 
-        if (!$result['list'] = $this->getDb()->field('id,group_id,location,address,user_mobile,stake_number,pay,status,create_time')->where($condition)->order('id desc')->limit($result['limit'])->select()) {
+        if (!$result['list'] = $this->getDb()->field('id,group_id,location,address,user_mobile,stake_number,total_money,status,create_time')->where($condition)->order('id desc')->limit($result['limit'])->select()) {
             return success($result);
         }
 
@@ -409,7 +436,7 @@ class ReportModel extends Crud {
 
         foreach ($result['list'] as $k => $v) {
             $result['lastpage'] = $v['id'];
-            $result['list'][$k]['pay'] = round_dollar($v['pay']);
+            $result['list'][$k]['total_money'] = round_dollar($v['total_money']);
             $result['list'][$k]['status_str'] = ReportStatus::getMessage($v['status']);
         }
 
@@ -481,11 +508,11 @@ class ReportModel extends Crud {
             return success([]);
         }
 
-        if (!$reportInfo = $this->find(['id' => $post['report_id']], 'id,group_id,location,address,user_id,user_mobile,law_id,colleague_id,stake_number,pay,status,create_time')) {
+        if (!$reportInfo = $this->find(['id' => $post['report_id']], 'id,group_id,location,address,user_id,user_mobile,law_id,colleague_id,stake_number,total_money,status,create_time')) {
             return error('案件未找到');
         }
 
-        $reportInfo['pay'] = round_dollar($reportInfo['pay']);
+        $reportInfo['total_money'] = round_dollar($reportInfo['total_money']);
 
         if ($post['data_type'] == 'all' || $post['data_type'] == 'paper') {
             // 路产受损赔付清单

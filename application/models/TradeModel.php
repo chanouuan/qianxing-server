@@ -33,11 +33,17 @@ class TradeModel extends Crud {
             return error('参数错误');
         }
 
+        $payInfo = TradeSource::getInstanceModel($post['source'])->createPay($user_id, $post);
+        if ($payInfo['errorcode'] !== 0) {
+            return $payInfo;
+        }
+        $payInfo = $payInfo['data'];
+
         // 订单号
         $orderCode = $this->generateOrderCode($user_id);
 
         // 防止重复下单
-        if ($lastTradeInfo = $this->find(['user_id' => $user_id, 'status' => 0, 'source' => $post['source'], 'order_id' => $post['order_id']], 'id,payway,create_time')) {
+        if ($lastTradeInfo = $this->find(['user_id' => $user_id, 'status' => 0, 'source' => $post['source'], 'order_id' => $post['order_id'], 'pay' => $payInfo['pay'], 'money' => $payInfo['money']], 'id,payway,create_time')) {
             if (!$lastTradeInfo['payway'] || $lastTradeInfo['payway'] == $post['payway']) {
                 if (strtotime($lastTradeInfo['create_time']) < TIMESTAMP - 600) {
                     // 更新订单号
@@ -52,26 +58,20 @@ class TradeModel extends Crud {
             }
         }
 
-        $result = TradeSource::getInstanceModel($post['source'])->createPay($user_id, $post);
-        if ($result['errorcode'] !== 0) {
-            return $result;
-        }
-        $result = $result['data'];
-
         // 生成交易单
         if (!$tradeId = $this->getDb()->insert([
             'source' => $post['source'],
             'user_id' => $user_id,
             'order_id' => $post['order_id'],
-            'pay' => $result['pay'],
-            'money' => $result['money'],
+            'pay' => $payInfo['pay'],
+            'money' => $payInfo['money'],
             'order_code' => $orderCode,
             'create_time' => date('Y-m-d H:i:s', TIMESTAMP)
-        ],true)) {
+        ], true)) {
             return error('交易单保存失败');
         }
 
-        if ($result['pay'] === 0) {
+        if ($payInfo['pay'] === 0) {
             // 无支付金额
             $result = $this->paySuccess($post['payway'], $orderCode);
             if ($result['errorcode'] !== 0) {

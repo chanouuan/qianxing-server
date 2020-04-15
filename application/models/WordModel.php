@@ -28,6 +28,48 @@ class WordModel extends Crud {
     }
 
     /**
+     * 生成 word
+     * @return string
+     */
+    public function createNote ($file_name, array $condition, $replace = false)
+    {
+        $templateSource = APPLICATION_PATH . '/public/static/word_template/' . $file_name . '.docx';
+        $templateSaveAs = $this->getSavePath($condition['id'], $file_name);
+        
+        if ($replace && file_exists(APPLICATION_PATH . '/public/' . $templateSaveAs)) {
+            return success([
+                'doc_url' => httpurl($templateSaveAs)
+            ]);
+        }
+
+        $templateProcessor = new \PhpOffice\PhpWord\TemplateProcessor($templateSource);
+
+        $variables = $templateProcessor->getVariables();
+
+        if (!$data = $this->getReportData($condition)) {
+            return error('数据为空');
+        }
+        
+        if ($data['values'] && array_intersect(array_keys($data['values']), $variables)) {
+            $templateProcessor->setValues($data['values']);
+        }
+        if ($data['images'] && array_intersect(array_keys($data['images']), $variables)) {
+            $templateProcessor->setImageValue(array_keys($data['images']), $data['images']);
+        }
+        if ($data['rows']['items'] && in_array('item.index', $variables)) {
+            $templateProcessor->cloneRowAndSetValues('item.index', $data['rows']['items']);
+        }
+
+        mkdirm(dirname(APPLICATION_PATH . '/public/' . $templateSaveAs));
+        $templateProcessor->saveAs(APPLICATION_PATH . '/public/' . $templateSaveAs);
+
+        unset($data);
+        return success([
+            'doc_url' => httpurl($templateSaveAs)
+        ]);
+    }
+
+    /**
      * 获取案件数据
      * @return array
      */
@@ -41,11 +83,12 @@ class WordModel extends Crud {
         $adminModel = new AdminModel();
         $userModel = new UserModel();
 
-        $reportData['pay'] = round_dollar($reportData['pay']);
-        $reportData['dollar'] = conver_chinese_dollar($reportData['pay']);
+        $reportData['total_money'] = round_dollar($reportData['total_money']);
+        $reportData['dollar'] = conver_chinese_dollar($reportData['total_money']);
         $reportData += $this->getSplitDate('handle_time', $reportData['handle_time']);
         $reportData += $this->getSplitDate('create_time', $reportData['create_time']);
-        unset($reportData['handle_time'], $reportData['report_time'], $reportData['create_time'], $reportData['update_time']);
+        $reportData += $this->getSplitDate('complete_time', $reportData['complete_time']);
+        unset($reportData['handle_time'], $reportData['report_time'], $reportData['create_time'], $reportData['complete_time'], $reportData['update_time']);
 
         // 获取单位
         $groupInfo = $groupModel->find(['id' => $reportData['group_id']], 'parent_id,name,address,phone,way_name');
@@ -69,11 +112,13 @@ class WordModel extends Crud {
         $lawNums = $adminModel->getLawNumByUser([$reportData['law_id'], $reportData['colleague_id']]);
         $reportData['law_lawnum'] = strval($lawNums[$reportData['law_id']]);
         $reportData['colleague_lawnum'] = strval($lawNums[$reportData['colleague_id']]);
+        $reportData['law_colleague_lawnum'] = implode('、', array_filter([$reportData['law_lawnum'], $reportData['colleague_lawnum']]));
         // 获取勘验人和记录人的姓名
         $userNames = $userModel->getUserNames([$reportData['law_id'], $reportData['colleague_id']]);
         $reportData['law_name'] = strval($userNames[$reportData['law_id']]);
         $reportData['colleague_name'] = strval($userNames[$reportData['colleague_id']]);
-        
+        $reportData['law_colleague_name'] = implode('、', array_filter([$reportData['law_name'], $reportData['colleague_name']]));
+
         $reportData += $this->getSplitDate('event_time', $reportData['event_time']);
         $reportData += $this->getSplitDate('check_start_time', $reportData['check_start_time']);
         $reportData += $this->getSplitDate('check_end_time', $reportData['check_end_time']);
@@ -86,12 +131,36 @@ class WordModel extends Crud {
         $reportData['weather'] = Weather::getMessage($reportData['weather']);
         $reportData['car_type'] = CarType::getMessage($reportData['car_type']);
 
-        $reportData['idcard_front'] = $this->getSplitLocalImage($reportData['idcard_front']);
-        $reportData['idcard_behind'] = $this->getSplitLocalImage($reportData['idcard_behind']);
-        $reportData['driver_license_front'] = $this->getSplitLocalImage($reportData['driver_license_front']);
-        $reportData['driver_license_behind'] = $this->getSplitLocalImage($reportData['driver_license_behind']);
-        $reportData['driving_license_front'] = $this->getSplitLocalImage($reportData['driving_license_front']);
-        $reportData['driving_license_behind'] = $this->getSplitLocalImage($reportData['driving_license_behind']);
+        $reportData['idcard_front'] = $this->getSplitLocalImage($reportData['idcard_front'], [
+            'width' => 600,
+            'height' => 'auto',
+            'ratio' => false
+        ]);
+        $reportData['idcard_behind'] = $this->getSplitLocalImage($reportData['idcard_behind'], [
+            'width' => 600,
+            'height' => 'auto',
+            'ratio' => false
+        ]);
+        $reportData['driver_license_front'] = $this->getSplitLocalImage($reportData['driver_license_front'], [
+            'width' => 300,
+            'height' => 'auto',
+            'ratio' => false
+        ]);
+        $reportData['driver_license_behind'] = $this->getSplitLocalImage($reportData['driver_license_behind'], [
+            'width' => 300,
+            'height' => 'auto',
+            'ratio' => false
+        ]);
+        $reportData['driving_license_front'] = $this->getSplitLocalImage($reportData['driving_license_front'], [
+            'width' => 300,
+            'height' => 'auto',
+            'ratio' => false
+        ]);
+        $reportData['driving_license_behind'] = $this->getSplitLocalImage($reportData['driving_license_behind'], [
+            'width' => 300,
+            'height' => 'auto',
+            'ratio' => false
+        ]);
         $reportData['signature_checker'] = $this->getSplitLocalImage($reportData['signature_checker']);
         $reportData['signature_writer'] = $this->getSplitLocalImage($reportData['signature_writer']);
         $reportData['signature_agent'] = $this->getSplitLocalImage($reportData['signature_agent']);
@@ -108,6 +177,7 @@ class WordModel extends Crud {
             }
         }
 
+        $reportData['item_name'] = [];
         // 获取赔付项目
         $items = $this->getDb()->table('qianxing_report_item')->field('name,unit,price,amount,total_money')->where(['report_id' => $reportData['id']])->select();
         $rows = [];
@@ -120,6 +190,9 @@ class WordModel extends Crud {
                 $rows['items'][$k]['item.amount'] = isset($v['amount']) ? $v['amount'] : '';
                 $rows['items'][$k]['item.price'] = isset($v['price']) ? round_dollar($v['price']) : '';
                 $rows['items'][$k]['item.total_money'] = isset($v['total_money']) ? round_dollar($v['total_money']) : '';
+                if ($v) {
+                    $reportData['item_name'][] = ($k + 1) . '、' . $v['name'] . $v['amount'] . $v['unit'];
+                }
             }
             unset($items);
         } else {
@@ -130,6 +203,7 @@ class WordModel extends Crud {
             $reportData['item.price'] = '';
             $reportData['item.total_money'] = '';
         }
+        $reportData['item_name'] = implode('；', $reportData['item_name']);
 
         return [
             'values' => $reportData,
@@ -147,24 +221,27 @@ class WordModel extends Crud {
         if (!file_exists($path)) {
             return '';
         }
+        if ($options['height'] == 'auto') {
+            $info = getimagesize($path);
+            $options['width'] = !$options['width'] || ($options['width'] > $info[0]) ? $info[0] :  $options['width'];
+            $ratio = $options['width'] / $info[0];
+            $options['height'] = intval($info[1] * $ratio);
+        }
         return array_merge([
             'path' => $path,
-            'height' => 22,
+            'height' => 30,
             'ratio' => true
         ], $options);
     }
 
     private function getSplitPhoto ($data)
     {
-        if (!$data) {
-            return [];
-        }
+        $data = $data ? json_decode($data, true) : [['src' => ''],['src' => ''],['src' => ''],['src' => ''],['src' => '']];
         $result = [];
-        $data = json_decode($data, true);
         foreach ($data as $k => $v) {
             $result['site_photos.' . $k] = $this->getSplitLocalImage($v['src'], [
-                'width' => 275,
-                'height' => 280,
+                'width' => 320,
+                'height' => 'auto',
                 'ratio' => false
             ]);
         }
@@ -179,7 +256,7 @@ class WordModel extends Crud {
         }
         $result = implode('；', $result);
         $result = mb_str_split($result, 1);
-        $result = array_pad($result, 100, ''); // 填充占位符
+        // $result = array_pad($result, 100, ''); // 填充占位符
         return implode('', $result);
     }
 

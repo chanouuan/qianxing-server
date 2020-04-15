@@ -757,7 +757,8 @@ function uploadfile ($upfile, $allow_type = 'jpg,jpeg,gif,png,bmp', $width = 80,
 
 function getthumburl ($url)
 {
-    return substr($url, 0, strrpos($url, '.')) . 't.jpg';
+    $pos = strrpos($url, '.');
+    return str_replace('.', '_', $url) . substr($url, $pos);
 }
 
 function image_rotate($image_file, int $degrees = 90) {
@@ -789,27 +790,38 @@ function image_rotate($image_file, int $degrees = 90) {
     return true;
 }
 
-function thumb ($src_img, $thumbname, $type = '', $dst_w = 120, $dst_h = 120)
+function thumb ($src_img, $thumbname, $image_type = null, $dst_w = 120, $dst_h = 120)
 {
-    $info = getImageInfo($src_img);
-    if (false === $info) {return false;}
+    $image_info = getimagesize($src_img);
+    if (false === $image_info) {
+        return false;
+    }
+
     mkdirm(dirname($thumbname));
+
     $dst_w = intval($dst_w);
     $dst_h = intval($dst_h);
     $dst_w = $dst_w < 48 ? 48 : $dst_w;
-    $src_w = $info['width'];
-    $src_h = $info['height'];
-    $type = $type ? $type : $info['type'];
-    $type = strtolower($type);
-    $type = $type == 'jpg' ? 'jpeg' : $type;
-    $type = $type == 'bmp' ? 'wbmp' : $type;
-    unset($info);
-    $createFun = 'imagecreatefrom' . $type;
-    $imageFun = 'image' . $type;
+    $src_w = $image_info[0];
+    $src_h = $image_info[1];
+
+    $image_type = $image_type ? $image_type : image_type_to_extension($image_info[2], false);
+    $image_type = strtolower($image_type);
+    $image_type = $image_type == 'jpg' ? 'jpeg' : $image_type;
+    $image_type = $image_type == 'bmp' ? 'wbmp' : $image_type;
+
     $scale = $dst_h > 0 ? min($dst_w / $src_w, $dst_h / $src_h) : $dst_w / $src_w;
+
+    $createFun = 'imagecreatefrom' . $image_type;
+    $imageFun = 'image' . $image_type;
+
     if ($scale >= 1) {
         // 原图尺寸小于缩略图
         $source = $createFun($src_img);
+        if ($image_type === 'png') {
+            imagealphablending($source, false);
+            imagesavealpha($source, true);
+        }
         $imageFun($source, $thumbname);
         imagedestroy($source);
         return $thumbname;
@@ -843,27 +855,14 @@ function thumb ($src_img, $thumbname, $type = '', $dst_w = 120, $dst_h = 120)
     $source = $createFun($src_img);
     $target = imagecreatetruecolor($width, $height); // 新建一个真彩色图像
     imagecopyresampled($target, $source, 0, 0, $x, $y, $width, $height, $w, $h); // 重采样拷贝部分图像并调整大小
+    if ($image_type === 'png') {
+        imagealphablending($target, false);
+        imagesavealpha($target, true);
+    }
     $imageFun($target, $thumbname); // 保存
     imagedestroy($target);
     imagedestroy($source);
     return $thumbname;
-}
-
-function getImageInfo ($img)
-{
-    $imageInfo = getimagesize($img);
-    if ($imageInfo !== false) {
-        $imageType = strtolower(substr(image_type_to_extension($imageInfo[2]), 1));
-        $info = array(
-                'width' => $imageInfo[0],
-                'height' => $imageInfo[1],
-                'type' => $imageType,
-                'mime' => $imageInfo['mime']
-        );
-        return $info;
-    } else {
-        return false;
-    }
 }
 
 function auto_page_arr ($page, $maxpage, $left = 3)
