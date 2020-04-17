@@ -16,6 +16,18 @@ class Weather
         5 => '雾'
     ];
 
+    public static function getKey ()
+    {
+        $result = [];
+        foreach (self::$message as $k => $v) {
+            $result[] = [
+                'id' => $k,
+                'name' => $v
+            ];
+        }
+        return $result;
+    }
+
     public static function format ($code)
     {
         return isset(self::$message[$code]) ? $code : null;

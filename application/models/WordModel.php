@@ -38,7 +38,7 @@ class WordModel extends Crud {
         
         if ($replace && file_exists(APPLICATION_PATH . '/public/' . $templateSaveAs)) {
             return success([
-                'doc_url' => httpurl($templateSaveAs)
+                'url' => httpurl($templateSaveAs)
             ]);
         }
 
@@ -65,7 +65,7 @@ class WordModel extends Crud {
 
         unset($data);
         return success([
-            'doc_url' => httpurl($templateSaveAs)
+            'url' => httpurl($templateSaveAs)
         ]);
     }
 

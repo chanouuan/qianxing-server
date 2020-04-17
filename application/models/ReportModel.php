@@ -159,7 +159,7 @@ class ReportModel extends Crud {
 
         $condition = [
             'id' => $post['report_id'], 
-            'status' => ReportStatus::ACCEPT
+            'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]]
         ];
         if (empty($adminCondition)) {
             $condition['law_id'] = $this->userInfo['id'];
@@ -167,11 +167,11 @@ class ReportModel extends Crud {
             $condition += $adminCondition;
         }
 
-        if (!$reportData = $this->find($condition, 'id,group_id,law_id,colleague_id,location,user_id')) {
+        if (!$reportData = $this->find($condition, 'id,group_id,law_id,colleague_id,location,user_id,status')) {
             return error('案件未找到');
         }
 
-        if (!$this->getDb()->where(['id' => $post['report_id'], 'status' => ReportStatus::ACCEPT])->update([
+        if (!$this->getDb()->where(['id' => $post['report_id'], 'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]]])->update([
             'status' => ReportStatus::HANDLED,
             'handle_time' => date('Y-m-d H:i:s', TIMESTAMP),
             'update_time' => date('Y-m-d H:i:s', TIMESTAMP)
@@ -179,14 +179,20 @@ class ReportModel extends Crud {
             return error('数据保存失败');
         }
 
-        // 更新统计数
-        $userCountModel = new UserCountModel();
-        $userCountModel->updateSet([$reportData['law_id'], $reportData['colleague_id']], [
-            'case_count' => ['case_count+1'],
-            'patrol_km' => ['patrol_km+' . (new GroupModel())->getDistance($reportData['group_id'], $reportData['location'])]
-        ]);
-        $userCountModel->updateCityRank([$reportData['law_id'], $reportData['colleague_id']], $reportData['group_id']);
-        $userCountModel->setReportCount('complete', null, $reportData['law_id']);
+        if ($reportData['status'] == ReportStatus::ACCEPT) {
+            // 更新统计数
+            $userCountModel = new UserCountModel();
+            $userCountModel->updateSet([$reportData['law_id'], $reportData['colleague_id']], [
+                'case_count' => ['case_count+1'],
+                'patrol_km' => ['patrol_km+' . (new GroupModel())->getDistance($reportData['group_id'], $reportData['location'])]
+            ]);
+            $userCountModel->updateCityRank([$reportData['law_id'], $reportData['colleague_id']], $reportData['group_id']);
+            $userCountModel->setReportCount('complete', null, $reportData['law_id']);
+        }
+        
+        // 删除赔偿通知书
+        $path = (new WordModel())->getSavePath($post['report_id'], 'paynote');
+        unlink(APPLICATION_PATH . '/public/' . $path);
 
         // todo 通知用户
         return success('ok');
@@ -206,7 +212,7 @@ class ReportModel extends Crud {
         $post['involved_act'] = trim_space($post['involved_act'], 0, 200);
         $post['extra_info'] = trim_space($post['extra_info'], 0, 200);
 
-        if (!$reportInfo = $this->find(['id' => $post['report_id'], 'law_id' => $this->userInfo['id'], 'status' => ReportStatus::ACCEPT], 'id')) {
+        if (!$reportInfo = $this->find(['id' => $post['report_id'], 'law_id' => $this->userInfo['id'], 'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]]], 'id')) {
             return error('案件未找到');
         }
 
@@ -244,7 +250,7 @@ class ReportModel extends Crud {
 
         if (!$this->getDb()->transaction(function ($db) use ($post, $items) {
             // 更新赔付金额
-            if (!$this->getDb()->where(['id' => $post['report_id'], 'status' => ReportStatus::ACCEPT])->update([
+            if (!$this->getDb()->where(['id' => $post['report_id'], 'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]]])->update([
                 'total_money' => array_sum(array_column($items, 'total_money')),
                 'update_time' => date('Y-m-d H:i:s', TIMESTAMP)
             ])) {
@@ -304,28 +310,33 @@ class ReportModel extends Crud {
      * 上传文件
      * @return array
      */
-    public function upload ($post) 
+    public function upload (array $post) 
     {
-        $post['report_id']          = intval($post['report_id']);
-        $post['report_field']       = trim_space($post['report_field'], 0, 22);
+        $post['report_id'] = intval($post['report_id']);
+        $post['report_field'] = trim_space($post['report_field'], 0, 22);
         $post['report_field_index'] = intval($post['report_field_index']);
 
         // 图片识别信息
-        $post['addr']   = trim_space($post['addr'], 0, 50); // 住址
-        $post['name']   = trim_space($post['name'], 0, 20); // 姓名
+        $post['addr'] = trim_space($post['addr'], 0, 50); // 住址
+        $post['name'] = trim_space($post['name'], 0, 20); // 姓名
         $post['idcard'] = Idcard::check_id($post['idcard']) ? $post['idcard'] : null; // 身份证号
         if ($post['idcard']) {
-            $post['gender']   = Idcard::parseidcard_getsex($post['idcard']);
+            $post['gender'] = Idcard::parseidcard_getsex($post['idcard']);
             $post['birthday'] = Idcard::parseidcard_getbirth($post['idcard']);
         }
         $post['plate_num'] = check_car_license($post['plate_num']) ? $post['plate_num'] : null; // 车牌号
+        $post['car_type'] = CarType::getCode($post['car_type']); // 行驶证的车辆类型
 
         if (!$post['report_field']) {
             return error('保存信息为空');
         }
 
-        if (!$reportInfo = $this->getDb()->table('qianxing_report_info')->field('site_photos')->where(['id' => $post['report_id']])->find()) {
+        if (!$this->count(['id' => $post['report_id'], 'law_id' => $this->userInfo['id'], 'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]]])) {
             return error('案件未找到');
+        }
+
+        if (!$reportInfo = $this->getDb()->table('qianxing_report_info')->field('site_photos')->where(['id' => $post['report_id']])->find()) {
+            return error('案件信息未找到');
         }
 
         if ($_FILES['upfile']['error'] !== 0) {
@@ -366,6 +377,7 @@ class ReportModel extends Crud {
         $update['gender']    = $post['gender'];
         $update['birthday']  = $post['birthday'];
         $update['plate_num'] = $post['plate_num'];
+        $update['car_type']  = $post['car_type'];
         $update = array_filter($update);
 
         if (false === $this->getDb()->table('qianxing_report_info')->where(['id' => $post['report_id']])->update($update)) {
@@ -508,18 +520,18 @@ class ReportModel extends Crud {
             return success([]);
         }
 
-        if (!$reportInfo = $this->find(['id' => $post['report_id']], 'id,group_id,location,address,user_id,user_mobile,law_id,colleague_id,stake_number,total_money,status,create_time')) {
+        if (!$reportData = $this->find(['id' => $post['report_id']], 'id,group_id,location,address,user_id,user_mobile,law_id,colleague_id,stake_number,total_money,status,create_time')) {
             return error('案件未找到');
         }
 
-        $reportInfo['total_money'] = round_dollar($reportInfo['total_money']);
+        $reportData['total_money'] = round_dollar($reportData['total_money']);
 
         if ($post['data_type'] == 'all' || $post['data_type'] == 'paper') {
             // 路产受损赔付清单
-            $reportInfo['items'] = $this->getDb()->field('property_id,name,unit,price,amount,total_money')->table('qianxing_report_item')->where(['report_id' => $post['report_id']])->select();
-            foreach ($reportInfo['items'] as $k => $v) {
-                $reportInfo['items'][$k]['price'] = round_dollar($v['price']);
-                $reportInfo['items'][$k]['total_money'] = round_dollar($v['total_money']);
+            $reportData['items'] = $this->getDb()->field('property_id,name,unit,price,amount,total_money')->table('qianxing_report_item')->where(['report_id' => $post['report_id']])->select();
+            foreach ($reportData['items'] as $k => $v) {
+                $reportData['items'][$k]['price'] = round_dollar($v['price']);
+                $reportData['items'][$k]['total_money'] = round_dollar($v['total_money']);
             }
         }
 
@@ -529,73 +541,86 @@ class ReportModel extends Crud {
             $fields = 'event_time,weather,car_type,event_type,driver_state,car_state,traffic_state';
         } else if ($post['data_type'] == 'card') {
             // 当事人信息
-            $fields = 'addr,full_name,idcard,gender,birthday,plate_num';
+            $fields = 'addr,full_name,idcard,gender,birthday,plate_num,car_type';
         } else if ($post['data_type'] == 'paper') {
             // 勘验笔录信息
             $fields = 'check_start_time,check_end_time,event_time,weather,car_type,full_name,plate_num,involved_action,involved_build_project,involved_act,involved_action_type,extra_info,signature_checker,signature_writer,signature_agent,signature_invitee';
         }
 
-        $reportInfo += $this->getDb()->field($fields)->table('qianxing_report_info')->where(['id' => $post['report_id']])->limit(1)->find();
+        if ($post['data_type'] == 'info') {
+            $reportData['car_type_list'] = \app\common\CarType::getKey();
+            $reportData['weather_list'] = \app\common\Weather::getKey();
+            $reportData['event_type_list'] = \app\common\EventType::getKey();
+            $reportData['driver_state_list'] = \app\common\DriverState::getKey();
+            $reportData['car_state_list'] = \app\common\CarState::getKey();
+            $reportData['traffic_state_list'] = \app\common\TrafficState::getKey();
+            // 获取同事
+            $reportData['colleague_list'] = (new UserModel())->getColleague($this->userInfo['id'], $this->userInfo['group_id']);
+        } else if ($post['data_type'] == 'card') {
+            $reportData['car_type_list'] = \app\common\CarType::getKey();
+        }
+
+        $reportData += $this->getDb()->field($fields)->table('qianxing_report_info')->where(['id' => $post['report_id']])->limit(1)->find();
 
         if ($post['data_type'] == 'paper') {
-            $reportInfo['weather'] = Weather::getMessage($reportInfo['weather']);
-            $reportInfo['car_type'] = CarType::getMessage($reportInfo['car_type']);
+            $reportData['weather'] = Weather::getMessage($reportData['weather']);
+            $reportData['car_type'] = CarType::getMessage($reportData['car_type']);
             // 获取勘验人和记录人的执法证号
-            $lawNums = (new AdminModel())->getLawNumByUser([$reportInfo['law_id'], $reportInfo['colleague_id']]);
-            $reportInfo['law_lawnum'] = strval($lawNums[$reportInfo['law_id']]);
-            $reportInfo['colleague_lawnum'] = strval($lawNums[$reportInfo['colleague_id']]);
+            $lawNums = (new AdminModel())->getLawNumByUser([$reportData['law_id'], $reportData['colleague_id']]);
+            $reportData['law_lawnum'] = strval($lawNums[$reportData['law_id']]);
+            $reportData['colleague_lawnum'] = strval($lawNums[$reportData['colleague_id']]);
         }
 
-        if (isset($reportInfo['idcard_front'])) {
-            $reportInfo['idcard_front'] = httpurl($reportInfo['idcard_front']);
+        if (isset($reportData['idcard_front'])) {
+            $reportData['idcard_front'] = httpurl($reportData['idcard_front']);
         }
-        if (isset($reportInfo['idcard_behind'])) {
-            $reportInfo['idcard_behind'] = httpurl($reportInfo['idcard_behind']);
+        if (isset($reportData['idcard_behind'])) {
+            $reportData['idcard_behind'] = httpurl($reportData['idcard_behind']);
         }
-        if (isset($reportInfo['driver_license_front'])) {
-            $reportInfo['driver_license_front'] = httpurl($reportInfo['driver_license_front']);
+        if (isset($reportData['driver_license_front'])) {
+            $reportData['driver_license_front'] = httpurl($reportData['driver_license_front']);
         }
-        if (isset($reportInfo['driver_license_behind'])) {
-            $reportInfo['driver_license_behind'] = httpurl($reportInfo['driver_license_behind']);
+        if (isset($reportData['driver_license_behind'])) {
+            $reportData['driver_license_behind'] = httpurl($reportData['driver_license_behind']);
         }
-        if (isset($reportInfo['driving_license_front'])) {
-            $reportInfo['driving_license_front'] = httpurl($reportInfo['driving_license_front']);
+        if (isset($reportData['driving_license_front'])) {
+            $reportData['driving_license_front'] = httpurl($reportData['driving_license_front']);
         }
-        if (isset($reportInfo['driving_license_behind'])) {
-            $reportInfo['driving_license_behind'] = httpurl($reportInfo['driving_license_behind']);
+        if (isset($reportData['driving_license_behind'])) {
+            $reportData['driving_license_behind'] = httpurl($reportData['driving_license_behind']);
         }
-        if ($reportInfo['site_photos']) {
-            $reportInfo['site_photos'] = json_decode($reportInfo['site_photos'], true);
-            foreach ($reportInfo['site_photos'] as $k => $v) {
-                $reportInfo['site_photos'][$k]['src'] = httpurl($v['src']);
+        if ($reportData['site_photos']) {
+            $reportData['site_photos'] = json_decode($reportData['site_photos'], true);
+            foreach ($reportData['site_photos'] as $k => $v) {
+                $reportData['site_photos'][$k]['src'] = httpurl($v['src']);
             }
         }
-        if ($reportInfo['extra_photos']) {
-            $reportInfo['extra_photos'] = json_decode($reportInfo['extra_photos'], true);
-            foreach ($reportInfo['extra_photos'] as $k => $v) {
-                $reportInfo['extra_photos'][$k]['src'] = httpurl($v['src']);
+        if ($reportData['extra_photos']) {
+            $reportData['extra_photos'] = json_decode($reportData['extra_photos'], true);
+            foreach ($reportData['extra_photos'] as $k => $v) {
+                $reportData['extra_photos'][$k]['src'] = httpurl($v['src']);
             }
         }
-        if (isset($reportInfo['involved_action'])) {
-            $reportInfo['involved_action'] = $reportInfo['involved_action'] ? json_decode($reportInfo['involved_action'], true) : [];
+        if (isset($reportData['involved_action'])) {
+            $reportData['involved_action'] = $reportData['involved_action'] ? json_decode($reportData['involved_action'], true) : [];
         }
-        if (isset($reportInfo['involved_action_type'])) {
-            $reportInfo['involved_action_type'] = $reportInfo['involved_action_type'] ? json_decode($reportInfo['involved_action_type'], true) : [];
+        if (isset($reportData['involved_action_type'])) {
+            $reportData['involved_action_type'] = $reportData['involved_action_type'] ? json_decode($reportData['involved_action_type'], true) : [];
         }
-        if (isset($reportInfo['signature_checker'])) {
-            $reportInfo['signature_checker'] = httpurl($reportInfo['signature_checker']);
+        if (isset($reportData['signature_checker'])) {
+            $reportData['signature_checker'] = httpurl($reportData['signature_checker']);
         }
-        if (isset($reportInfo['signature_writer'])) {
-            $reportInfo['signature_writer'] = httpurl($reportInfo['signature_writer']);
+        if (isset($reportData['signature_writer'])) {
+            $reportData['signature_writer'] = httpurl($reportData['signature_writer']);
         }
-        if (isset($reportInfo['signature_agent'])) {
-            $reportInfo['signature_agent'] = httpurl($reportInfo['signature_agent']);
+        if (isset($reportData['signature_agent'])) {
+            $reportData['signature_agent'] = httpurl($reportData['signature_agent']);
         }
-        if (isset($reportInfo['signature_invitee'])) {
-            $reportInfo['signature_invitee'] = httpurl($reportInfo['signature_invitee']);
+        if (isset($reportData['signature_invitee'])) {
+            $reportData['signature_invitee'] = httpurl($reportData['signature_invitee']);
         }
 
-        return success($reportInfo);
+        return success($reportData);
     }
 
     /**
@@ -625,7 +650,7 @@ class ReportModel extends Crud {
         }
 
         if ($post['report_id']) {
-            if (!$this->count(['id' => $post['report_id'], 'status' => ReportStatus::ACCEPT, 'law_id' => $this->userInfo['id']])) {
+            if (!$this->count(['id' => $post['report_id'], 'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]], 'law_id' => $this->userInfo['id']])) {
                 return error('案件未找到');
             }
         }
@@ -701,6 +726,7 @@ class ReportModel extends Crud {
         $post['report_id'] = intval($post['report_id']);
         $post['addr']      = trim_space($post['addr'], 0, 50);
         $post['full_name'] = trim_space($post['full_name'], 0, 20);
+        $post['car_type']  = CarType::format($post['car_type']);
         
         if ($post['plate_num'] && !check_car_license($post['plate_num'])) {
             return error('车牌号格式不正确');
@@ -735,6 +761,7 @@ class ReportModel extends Crud {
                 'addr' => $post['addr'],
                 'full_name' => $post['full_name'],
                 'plate_num' => $post['plate_num'],
+                'car_type' => $post['car_type'],
                 'idcard' => $post['idcard'],
                 'gender' => $post['gender'],
                 'birthday' => $post['birthday'],
@@ -768,11 +795,11 @@ class ReportModel extends Crud {
     {
         $post['report_id'] = intval($post['report_id']);
 
-        if (!$reportInfo = $this->find(['id' => $post['report_id'], 'law_id' => $this->userInfo['id'], 'status' => ReportStatus::ACCEPT], 'id')) {
+        if (!$reportInfo = $this->find(['id' => $post['report_id'], 'law_id' => $this->userInfo['id'], 'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]]], 'id')) {
             return error('案件未找到');
         }
 
-        if (!$this->getDb()->where(['id' => $post['report_id']])->update([
+        if (!$this->getDb()->where(['id' => $post['report_id'], 'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]]])->update([
             'status' => ReportStatus::CANCEL,
             'update_time' => date('Y-m-d H:i:s', TIMESTAMP)
         ])) {

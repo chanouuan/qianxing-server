@@ -15,6 +15,18 @@ class EventType
         4 => '社会安全事件'
     ];
 
+    public static function getKey ()
+    {
+        $result = [];
+        foreach (self::$message as $k => $v) {
+            $result[] = [
+                'id' => $k,
+                'name' => $v
+            ];
+        }
+        return $result;
+    }
+
     public static function format ($code)
     {
         return isset(self::$message[$code]) ? $code : null;

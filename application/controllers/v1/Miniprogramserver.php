@@ -324,21 +324,6 @@ class Miniprogramserver extends ActionPDO {
     }
 
     /**
-     * 获取同事
-     * @login
-     * @return array
-     * {
-     * "errorcode":0,
-     * "message":"",
-     * "data":[]
-     * }
-     */
-    public function getColleague ()
-    {
-        return (new \app\models\UserModel())->getColleague($this->_G['user']['user_id']);
-    }
-
-    /**
      * 保存当事人信息
      * @login
      * @return array

@@ -35,9 +35,6 @@ class UserModel extends Crud {
             // 新注册用户，并绑定授权码
             if (!$userId = $this->getDb()->transaction(function ($db) use ($post) {
                 if (!$id = $db->insert([
-                    'nick_name' => trim_space($post['nickName'], 0, 30),
-                    'avatar' => $post['avatarUrl'],
-                    'gender' => Gender::format($post['gender']),
                     'create_time' => date('Y-m-d H:i:s', TIMESTAMP)
                 ], true)) {
                     return false;
@@ -209,9 +206,7 @@ class UserModel extends Crud {
         if (isset($userInfo['avatar'])) {
             $userInfo['avatar'] = httpurl($userInfo['avatar']);
         }
-        if (isset($userInfo['nick_name'])) {
-            $userInfo['nick_name'] = get_real_val($userInfo['full_name'], $userInfo['nick_name'], $userInfo['telephone']);
-        }
+        $userInfo['nick_name'] = get_real_val($userInfo['full_name'], $userInfo['nick_name'], $userInfo['telephone']);
         // 部门
         if ($userInfo['group_id']) {
             $groupInfo = (new GroupModel())->find(['id' => $userInfo['group_id']], 'name');
@@ -240,10 +235,9 @@ class UserModel extends Crud {
      * 获取同事
      * @return array
      */
-    public function getColleague (int $user_id)
+    public function getColleague (int $user_id, int $group_id)
     {
-        $userInfo = $this->checkUserInfo($user_id);
-        return success($this->select(['group_id' => $userInfo['group_id'], 'id' => ['<>', $user_id], 'status' => 1], 'id,full_name as name'));
+        return $this->select(['group_id' => $group_id, 'id' => ['<>', $user_id], 'status' => 1], 'id,full_name as name');
     }
 
     /**

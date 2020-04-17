@@ -8,7 +8,6 @@ namespace app\common;
 class PropertyCategory
 {
 
-
     static $message = [
         1 => '利用、占用公路、公路用地及设施',
         2 => '污染公路、留用地及设施',
