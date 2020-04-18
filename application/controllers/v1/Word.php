@@ -36,7 +36,7 @@ class Word extends ActionPDO {
             $userInfo = (new \app\models\AdminModel())->checkAdminInfo($this->_G['user']['user_id']);
             $condition['group_id'] = $userInfo['group_id'];
         }
-        return (new \app\models\WordModel())->createNote($this->_action, $condition);
+        return (new \app\models\WordModel())->createNote($this->_action, $condition, 'pdf');
     }
 
     /**
@@ -51,7 +51,7 @@ class Word extends ActionPDO {
             'id' => intval($_POST['report_id']),
             'group_id' => $userInfo['group_id']
         ];
-        return (new \app\models\WordModel())->createNote($this->_action, $condition, true);
+        return (new \app\models\WordModel())->createNote($this->_action, $condition, 'pdf', true);
     }
 
     /**

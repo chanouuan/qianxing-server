@@ -28,17 +28,40 @@ class WordModel extends Crud {
     }
 
     /**
+     * word2pdf
+     * @return string
+     */
+    private function word2pdf ($docfile_path, $replace = false)
+    {
+        if (PHP_OS !== 'Linux') {
+            return httpurl($docfile_path);
+        }
+        $pdf_path = str_replace('.docx', '.pdf', $docfile_path);
+        if (!$replace && file_exists(APPLICATION_PATH . '/public/' . $pdf_path)) {
+            return httpurl($pdf_path);
+        } 
+        shell_exec('sudo /usr/bin/unoconv -f pdf ' . APPLICATION_PATH . '/public/' . $docfile_path);
+        return file_exists(APPLICATION_PATH . '/public/' . $pdf_path) ? httpurl($pdf_path) : null;
+    }
+
+    /**
      * 生成 word
      * @return string
      */
-    public function createNote ($file_name, array $condition, $replace = false)
+    public function createNote ($file_name, array $condition, $output_format = 'docx', $replace = false)
     {
         $templateSource = APPLICATION_PATH . '/public/static/word_template/' . $file_name . '.docx';
         $templateSaveAs = $this->getSavePath($condition['id'], $file_name);
         
-        if ($replace && file_exists(APPLICATION_PATH . '/public/' . $templateSaveAs)) {
+        if (!$replace && file_exists(APPLICATION_PATH . '/public/' . $templateSaveAs)) {
+            $url = httpurl($templateSaveAs);
+            if ($output_format == 'pdf') {
+                if (!$url = $this->word2pdf($templateSaveAs)) {
+                    return error('预览文书未生成，请重试！');
+                }
+            }
             return success([
-                'url' => httpurl($templateSaveAs)
+                'url' => $url
             ]);
         }
 
@@ -64,8 +87,17 @@ class WordModel extends Crud {
         $templateProcessor->saveAs(APPLICATION_PATH . '/public/' . $templateSaveAs);
 
         unset($data);
+        if (!file_exists(APPLICATION_PATH . '/public/' . $templateSaveAs)) {
+            return error('文书未生成，请重试！');
+        }
+        $url = httpurl($templateSaveAs);
+        if ($output_format == 'pdf') {
+            if (!$url = $this->word2pdf($templateSaveAs, true)) {
+                return error('文书尚未生成，请重试！');
+            }
+        }
         return success([
-            'url' => httpurl($templateSaveAs)
+            'url' => $url
         ]);
     }
 
