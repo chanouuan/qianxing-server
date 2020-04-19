@@ -296,10 +296,10 @@ class WordModel extends Crud {
         foreach ($data as $k => $v) {
             $result[] = ($k + 1) . '. ' . $v['name'] . $v['amount'] . $v['unit'];
         }
-        $result = implode('；', $result);
-        $result = mb_str_split($result, 1);
+        return implode('；', $result);
+        // $result = mb_str_split($result, 1);
         // $result = array_pad($result, 100, ''); // 填充占位符
-        return implode('', $result);
+        // return implode('', $result);
     }
 
     private function getSplitCheckBoxIf ($data)
