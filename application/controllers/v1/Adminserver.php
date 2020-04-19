@@ -97,6 +97,73 @@ class Adminserver extends ActionPDO {
     }
 
     /**
+     * 首页统计
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "result":{}
+     * }
+     */
+    public function indexCount ()
+    {
+        $userInfo = (new \app\models\AdminModel())->checkAdminInfo($this->_G['user']['user_id']);
+
+        // 今日报警数
+        $today_bj = \app\library\DB::getInstance()
+            ->table('qianxing_report')
+            ->where([
+                'group_id' => $userInfo['group_id'],
+                'create_time' => ['>="' . date('Y-m-d', TIMESTAMP) . '"']
+            ])->count();
+
+        // 累计案件数
+        $total_bj = \app\library\DB::getInstance()
+            ->table('qianxing_report')
+            ->where([
+                'group_id' => $userInfo['group_id']
+            ])->count();
+
+        // 今年案件处置数(按月)
+        $data = \app\library\DB::getInstance()
+            ->table('qianxing_report')
+            ->field('status,left(create_time, 7) as date,count(*) as count')
+            ->where([
+                'group_id' => $userInfo['group_id'],
+                'create_time' => ['>="' . date('Y-1-1', TIMESTAMP) . '"']
+            ])
+            ->group('status,date')
+            ->select();
+        $dataset = [];
+        foreach ($data as $k => $v) {
+            $dataset[$v['status']][$v['date']] = $v['count'];
+        }
+        $date = [];
+        for ($i = 1; $i <= 12; $i ++) {
+            $date[] = date('Y-' . ($i < 10 ? '0' . $i : $i), TIMESTAMP);
+        }
+        $line = [
+            $date, []
+        ];
+        foreach ($line[0] as $k => $v) {
+            $line[0][$k] = intval(substr($v, 5, 2)) . '月';
+        }
+        foreach ($dataset as $k => $v) {
+            $set = [];
+            foreach ($date as $vv) {
+                $set[] = isset($v[$vv]) ? $v[$vv] : 0;
+            }
+            $line[1][\app\common\ReportStatus::getMessage($k)] = $set;
+        }
+        unset($data, $date, $dataset);
+        return success([
+            [$today_bj, 0, 0, $total_bj],
+            $line
+        ]);
+    }
+
+    /**
      * 获取案件列表
      * @login
      * @param page 当前页

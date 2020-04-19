@@ -9,8 +9,9 @@ class Word extends ActionPDO {
     public function _ratelimit ()
     {
         return [
-            'paynote'  => ['interval' => 2000],
-            'itemnote' => ['interval' => 2000]
+            'paynote'  => ['interval' => 5000],
+            'itemnote' => ['interval' => 5000],
+            'allnote'  => ['interval' => 5000]
         ];
     }
 

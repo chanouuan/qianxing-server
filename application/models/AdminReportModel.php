@@ -3,12 +3,7 @@
 namespace app\models;
 
 use Crud;
-use app\library\LocationUtils;
-use app\library\Idcard;
 use app\common\Gender;
-use app\common\GenerateCache;
-use app\common\CommonStatus;
-use app\common\PayWay;
 use app\common\ReportStatus;
 use app\common\Weather;
 use app\common\CarType;
@@ -51,8 +46,7 @@ class AdminReportModel extends Crud {
         }
 
         // 删除卷宗文件
-        $path = (new WordModel())->getSavePath($post['report_id'], 'allnote');
-        unlink(APPLICATION_PATH . '/public/' . $path);
+        (new WordModel())->removeDocFile($post['report_id'], 'allnote');
 
         return success('ok');
     }
@@ -240,7 +234,7 @@ class AdminReportModel extends Crud {
      */
     public function reportFile (array $post)
     {
-        return (new ReportModel($this->userInfo['id']))->reportFile($post, [
+        return (new ReportModel())->reportFile($post, [
             'group_id' => $this->userInfo['group_id']
         ]);
     }

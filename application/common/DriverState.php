@@ -9,7 +9,8 @@ class DriverState
 {
 
     static $message = [
-        1 => '待核实'
+        1 => '无人员受伤',
+        2 => '有人员受伤'
     ];
 
     public static function getKey ()

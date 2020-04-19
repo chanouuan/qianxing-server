@@ -9,9 +9,12 @@ class TrafficState
 {
 
     static $message = [
-        1 => '待核实'
+        1 => '通行正常',
+        2 => '半幅通行',
+        3 => '半幅双向通行',
+        4 => '交通中断'
     ];
-
+    
     public static function getKey ()
     {
         $result = [];

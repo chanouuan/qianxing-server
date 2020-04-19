@@ -9,9 +9,12 @@ class CarState
 {
 
     static $message = [
-        1 => '待核实'
+        1 => '单车事故',
+        2 => '两车追尾',
+        3 => '三车追尾',
+        4 => '多车追尾'
     ];
-
+    
     public static function getKey ()
     {
         $result = [];

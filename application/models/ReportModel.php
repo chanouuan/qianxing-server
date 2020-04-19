@@ -191,8 +191,7 @@ class ReportModel extends Crud {
         }
         
         // 删除赔偿通知书
-        $path = (new WordModel())->getSavePath($post['report_id'], 'paynote');
-        unlink(APPLICATION_PATH . '/public/' . $path);
+        (new WordModel())->removeDocFile($post['report_id'], 'paynote');
 
         // todo 通知用户
         return success('ok');
@@ -516,13 +515,28 @@ class ReportModel extends Crud {
     {
         $post['report_id'] = intval($post['report_id']);
 
-        if (!$post['report_id']) {
-            return success([]);
+        $reportData = [];
+        if ($post['data_type'] == 'info') {
+            $reportData['car_type_list'] = \app\common\CarType::getKey();
+            $reportData['weather_list'] = \app\common\Weather::getKey();
+            $reportData['event_type_list'] = \app\common\EventType::getKey();
+            $reportData['driver_state_list'] = \app\common\DriverState::getKey();
+            $reportData['car_state_list'] = \app\common\CarState::getKey();
+            $reportData['traffic_state_list'] = \app\common\TrafficState::getKey();
+            $reportData['colleague_list'] = (new UserModel())->getColleague($this->userInfo['id'], $this->userInfo['group_id']);
+        } else if ($post['data_type'] == 'card') {
+            $reportData['car_type_list'] = \app\common\CarType::getKey();
         }
 
-        if (!$reportData = $this->find(['id' => $post['report_id']], 'id,group_id,location,address,user_id,user_mobile,law_id,colleague_id,stake_number,total_money,status,create_time')) {
+        if (!$post['report_id']) {
+            return success($reportData);
+        }
+
+        if (!$data = $this->find(['id' => $post['report_id']], 'id,group_id,location,address,user_id,user_mobile,law_id,colleague_id,stake_number,total_money,status,create_time')) {
             return error('案件未找到');
         }
+        $reportData += $data;
+        unset($data);
 
         $reportData['total_money'] = round_dollar($reportData['total_money']);
 
@@ -538,26 +552,13 @@ class ReportModel extends Crud {
         $fields = null;
         if ($post['data_type'] == 'info') {
             // 报送信息
-            $fields = 'event_time,weather,car_type,event_type,driver_state,car_state,traffic_state';
+            $fields = 'event_time,weather,car_type,event_type,driver_state,car_state,traffic_state,pass_time';
         } else if ($post['data_type'] == 'card') {
             // 当事人信息
             $fields = 'addr,full_name,idcard,gender,birthday,plate_num,car_type';
         } else if ($post['data_type'] == 'paper') {
             // 勘验笔录信息
             $fields = 'check_start_time,check_end_time,event_time,weather,car_type,full_name,plate_num,involved_action,involved_build_project,involved_act,involved_action_type,extra_info,signature_checker,signature_writer,signature_agent,signature_invitee';
-        }
-
-        if ($post['data_type'] == 'info') {
-            $reportData['car_type_list'] = \app\common\CarType::getKey();
-            $reportData['weather_list'] = \app\common\Weather::getKey();
-            $reportData['event_type_list'] = \app\common\EventType::getKey();
-            $reportData['driver_state_list'] = \app\common\DriverState::getKey();
-            $reportData['car_state_list'] = \app\common\CarState::getKey();
-            $reportData['traffic_state_list'] = \app\common\TrafficState::getKey();
-            // 获取同事
-            $reportData['colleague_list'] = (new UserModel())->getColleague($this->userInfo['id'], $this->userInfo['group_id']);
-        } else if ($post['data_type'] == 'card') {
-            $reportData['car_type_list'] = \app\common\CarType::getKey();
         }
 
         $reportData += $this->getDb()->field($fields)->table('qianxing_report_info')->where(['id' => $post['report_id']])->limit(1)->find();
@@ -641,9 +642,10 @@ class ReportModel extends Crud {
         $post['driver_state']  = DriverState::format($post['driver_state']);
         $post['car_state']     = CarState::format($post['car_state']);
         $post['traffic_state'] = TrafficState::format($post['traffic_state']);
+        $post['pass_time']     = intval($post['pass_time']);
 
         if (!$post['location'] || !$post['address']) {
-            return error('请打开定位');
+            return error('请定位位置');
         }
         if (!$post['stake_number']) {
             return error('请输入桩号');
@@ -674,7 +676,8 @@ class ReportModel extends Crud {
                     'event_type' => $post['event_type'],
                     'driver_state' => $post['driver_state'],
                     'car_state' => $post['car_state'],
-                    'traffic_state' => $post['traffic_state']
+                    'traffic_state' => $post['traffic_state'],
+                    'pass_time' => $post['pass_time']
                 ])) {
                     return false;
                 }
@@ -703,6 +706,7 @@ class ReportModel extends Crud {
                     'driver_state' => $post['driver_state'],
                     'car_state' => $post['car_state'],
                     'traffic_state' => $post['traffic_state'],
+                    'pass_time' => $post['pass_time'],
                     'check_start_time' => date('Y-m-d H:i:s', TIMESTAMP - 600),
                     'check_end_time' => date('Y-m-d H:i:s', TIMESTAMP)
                 ])) {

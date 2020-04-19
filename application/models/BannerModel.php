@@ -17,8 +17,12 @@ class BannerModel extends Crud {
     {
         $result = [
             [
-                'img' => httpurl('/static/img/banner-2.jpg'),
-                'title' => '加强疫情防控工作指导'
+                'img' => httpurl('/static/img/pic1.jpg'),
+                'title' => ''
+            ],
+            [
+                'img' => httpurl('/static/img/pic2.jpg'),
+                'title' => ''
             ]
         ];
         return $result;

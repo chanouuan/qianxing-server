@@ -28,18 +28,28 @@ class WordModel extends Crud {
     }
 
     /**
+     * 删除文件
+     * @return bool
+     */
+    public function removeDocFile ($id, $suffix = '')
+    {
+        $path = $this->getSavePath($id, $suffix);
+        return unlink(APPLICATION_PATH . '/public/' . $path);
+    }
+
+    /**
      * word2pdf
      * @return string
      */
     private function word2pdf ($docfile_path, $replace = false)
     {
-        if (PHP_OS !== 'Linux') {
-            return httpurl($docfile_path);
-        }
         $pdf_path = str_replace('.docx', '.pdf', $docfile_path);
         if (!$replace && file_exists(APPLICATION_PATH . '/public/' . $pdf_path)) {
             return httpurl($pdf_path);
-        } 
+        }
+        if (PHP_OS !== 'Linux') {
+            return httpurl($docfile_path);
+        }
         shell_exec('sudo /usr/bin/unoconv -f pdf ' . APPLICATION_PATH . '/public/' . $docfile_path);
         return file_exists(APPLICATION_PATH . '/public/' . $pdf_path) ? httpurl($pdf_path) : null;
     }
