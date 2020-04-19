@@ -792,6 +792,11 @@ function image_rotate($image_file, int $degrees = 90) {
 
 function thumb ($src_img, $thumbname, $image_type = null, $dst_w = 120, $dst_h = 120)
 {
+    // $dst_w>0 && $dst_h>0 为抠图方式，否则为缩放方式 
+    if ($dst_w <= 0 && $dst_h <= 0) {
+        return false;
+    }
+
     $image_info = getimagesize($src_img);
     if (false === $image_info) {
         return false;
@@ -801,7 +806,6 @@ function thumb ($src_img, $thumbname, $image_type = null, $dst_w = 120, $dst_h =
 
     $dst_w = intval($dst_w);
     $dst_h = intval($dst_h);
-    $dst_w = $dst_w < 48 ? 48 : $dst_w;
     $src_w = $image_info[0];
     $src_h = $image_info[1];
 
@@ -810,48 +814,73 @@ function thumb ($src_img, $thumbname, $image_type = null, $dst_w = 120, $dst_h =
     $image_type = $image_type == 'jpg' ? 'jpeg' : $image_type;
     $image_type = $image_type == 'bmp' ? 'wbmp' : $image_type;
 
-    $scale = $dst_h > 0 ? min($dst_w / $src_w, $dst_h / $src_h) : $dst_w / $src_w;
-
-    $createFun = 'imagecreatefrom' . $image_type;
-    $imageFun = 'image' . $image_type;
-
-    if ($scale >= 1) {
-        // 原图尺寸小于缩略图
-        $source = $createFun($src_img);
-        if ($image_type === 'png') {
-            imagealphablending($source, false);
-            imagesavealpha($source, true);
-        }
-        $imageFun($source, $thumbname);
-        imagedestroy($source);
-        return $thumbname;
+    // 计算缩放比例
+    if ($dst_w == 0) {
+        $scale = $dst_h / $src_h;
+    } else if ($dst_h == 0) {
+        $scale = $dst_w / $src_w;
+    } else {
+        // 不缩放
+        $scale = 0;
     }
+
     // 计算缩略图尺寸
-    $width = intval($src_w * $scale);
-    $height = intval($src_h * $scale);
-    $w = $src_w;
-    $h = $src_h;
-    $x = 0;
-    $y = 0;
-    if ($height > $width) {
-        if ($height / $width > 6) {
-            // 过高
-            $w = $src_w;
-            $h = $height;
-            $width = min($src_w, $dst_w);
-            $x = 0;
-            $y = ($src_h - $h) / 3;
+    if ($scale > 0) {
+        $width = intval($src_w * $scale);
+        $height = intval($src_h * $scale);
+    } else {
+        $width = $dst_w > $src_w ? $src_w : $dst_w;
+        $height = $dst_h > $src_h ? $src_h : $dst_h;
+    }
+
+    if ($width >= $src_w && $height >= $src_h) {
+        // 原图尺寸小于缩略图
+        return false;
+    }
+
+    // 定位原图
+    if ($scale > 0) {
+        // 缩放方式
+        $x = 0;
+        $y = 0;
+        $w = $src_w;
+        $h = $src_h;
+        if ($height > $width) {
+            if ($height / $width > 6) {
+                // 过高
+                $w = $src_w;
+                $h = $height;
+                $width = $dst_w > 0 ? min($src_w, $dst_w) : $src_w;
+                $x = 0;
+                $y = ($src_h - $h) / 3;
+            }
+        } else {
+            if ($width / $height > 6) {
+                // 过宽
+                $w = $dst_w > 0 ? $dst_w : $src_w;
+                $h = $src_h;
+                $height = min($src_h, $dst_h > 0 ? $dst_h : $dst_w);
+                $x = ($src_w - $w) / 2;
+                $y = 0;
+            }
         }
     } else {
-        if ($width / $height > 6) {
-            // 过宽
-            $w = $dst_w;
-            $h = $src_h;
-            $height = min($src_h, $dst_h > 0 ? $dst_h : $dst_w);
-            $x = ($src_w - $w) / 2;
-            $y = 0;
+        // 抠图方式
+        $x = 0;
+        $y = 0;
+        $w = $width;
+        $h = $height;
+        if ($width < $src_w) {
+            $x = intval(($src_w - $width) / 2);
+        }
+        if ($height < $src_h) {
+            $y = intval(($src_h - $height) / 2);
         }
     }
+    
+    $createFun = 'imagecreatefrom' . $image_type;
+    $imageFun = 'image' . $image_type;
+    
     $source = $createFun($src_img);
     $target = imagecreatetruecolor($width, $height); // 新建一个真彩色图像
     imagecopyresampled($target, $source, 0, 0, $x, $y, $width, $height, $w, $h); // 重采样拷贝部分图像并调整大小

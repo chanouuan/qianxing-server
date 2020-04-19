@@ -350,7 +350,7 @@ class ReportModel extends Crud {
             $post['report_field'] === 'signature_invitee'
             ) ? 90 : 0;
 
-        $uploadfile = uploadfile($_FILES['upfile'], 'jpg,jpeg,png', $rotate ? 0 : 800, 0, $rotate);
+        $uploadfile = uploadfile($_FILES['upfile'], 'jpg,jpeg,png', $rotate > 0 ? 0 : 750, $rotate > 0 ? 0 : 500, $rotate);
         if ($uploadfile['errorcode'] !== 0) {
             return $uploadfile;
         }
