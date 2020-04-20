@@ -456,7 +456,7 @@ class UserModel extends Crud {
         }
 
         // 发送短信
-        return (new \app\library\AliSmsHelper())->sendSms('扶桑云医', 'SMS_133971610', $post['telephone'], ['code' => $code]);
+        return (new MsgModel())->sendCode($post['telephone'], $code);
     }
 
 }

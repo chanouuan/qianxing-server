@@ -96,7 +96,7 @@ class UserCountModel extends Crud {
         foreach ($user_id as $k => $v) {
             $rank = array_search($v, $users);
             $rank = false === $rank ? 0 : $rank + 1;
-            $this->updateSet($v, ['city_rank' => ['city_rank+' . $rank]]);
+            $this->updateSet($v, ['city_rank' => $rank]);
         }
         unset($users);
     }

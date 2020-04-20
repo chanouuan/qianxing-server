@@ -31,7 +31,7 @@ class UserReportModel extends Crud {
             return error('该单位未找到');
         }
 
-        if (!$this->count(['id' => $post['report_id'], 'group_id' => $userInfo['group_id'], 'status' => ReportStatus::WAITING])) {
+        if (!$userReport = $this->find(['id' => $post['report_id'], 'group_id' => $userInfo['group_id'], 'status' => ReportStatus::WAITING], 'user_mobile,address,report_type')) {
             return error('报案信息未找到');
         }
 
@@ -46,6 +46,7 @@ class UserReportModel extends Crud {
         (new UserCountModel())->setReportCount('old', $post['target_id'], null, $userInfo['group_id']);
 
         // todo 通知单位
+        (new MsgModel())->sendReportEventSms($userInfo['group_id'], $userReport);
 
         return success('ok');
     }
@@ -146,10 +147,19 @@ class UserReportModel extends Crud {
             return error('未找到该单位');
         }
 
-
         // 限制重复报案
         if ($this->count(['user_id' => $user_id, 'status' => ReportStatus::WAITING, 'create_time' => ['>', date('Y-m-d H:i:s', TIMESTAMP - 3600)]])) {
             return error('您已报案，工作人员正在加紧审理案件，请耐心等候');
+        }
+
+        // 防止一个地点多人报案
+        if ($locations = $this->select(['group_id' => $post['group_id'], 'status' => ReportStatus::WAITING, 'create_time' => ['>', date('Y-m-d H:i:s', TIMESTAMP - 3600)]], 'location')) {
+            foreach ($locations as $k => $v) {
+                if (\app\library\LocationUtils::getDistance($v['location'], $post['location']) < 50) {
+                    return error('有其他人已报案，工作人员正在加紧审理，请耐心等候');
+                }
+            }
+            unset($locations);
         }
 
         if (!$this->getDb()->insert([
@@ -171,6 +181,11 @@ class UserReportModel extends Crud {
         (new UserCountModel())->setReportCount('new', $post['group_id']);
 
         // todo 推送消息
+        (new MsgModel())->sendReportEventSms($post['group_id'], [
+            'user_mobile' => $userInfo['telephone'],
+            'address' => $post['address'],
+            'report_type' => $post['report_type']
+        ]);
 
         return success($groupInfo);
     }

@@ -258,7 +258,7 @@ class AdminReportModel extends Crud {
             'group_id' => $this->userInfo['group_id']
         ];
 
-        if (!$reportData = $this->find($condition, 'id,pay,cash,total_money')) {
+        if (!$reportData = $this->find($condition, 'id,law_id,pay,cash,total_money')) {
             return error('案件未找到');
         }
 
@@ -275,6 +275,11 @@ class AdminReportModel extends Crud {
             'complete_time' => date('Y-m-d H:i:s', TIMESTAMP)
         ])) {
             return error('更新数据失败');
+        }
+
+        if ($post['money'] === $discost) {
+            // 推送通知
+            (new MsgModel())->sendReportCompleteSms($reportData['law_id'], $reportData['id']);
         }
 
         return success('ok');

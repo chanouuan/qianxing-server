@@ -3,7 +3,6 @@
 namespace app\models;
 
 use Crud;
-use app\library\LocationUtils;
 use app\library\Idcard;
 use app\common\Gender;
 use app\common\GenerateCache;
@@ -47,11 +46,11 @@ class ReportModel extends Crud {
         }
 
         // 同部门
-        if (!(new UserModel())->count(['id' => $post['target_id'], 'group_id' => $this->userInfo['group_id']])) {
+        if (!$targetUser = (new UserModel())->find(['id' => $post['target_id'], 'group_id' => $this->userInfo['group_id']], 'telephone')) {
             return error('该移交人不在同部门');
         }
 
-        if (!$this->count(['id' => $post['report_id'], 'group_id' => $this->userInfo['group_id'], 'status' => ReportStatus::ACCEPT])) {
+        if (!$reportData = $this->find(['id' => $post['report_id'], 'group_id' => $this->userInfo['group_id'], 'status' => ReportStatus::ACCEPT], 'user_mobile')) {
             return error('案件信息未找到');
         }
 
@@ -66,6 +65,7 @@ class ReportModel extends Crud {
         (new UserCountModel())->setReportCount('old', null, $post['target_id'], null, $this->userInfo['id']);
 
         // todo 通知移交人
+        (new MsgModel())->sendReportAcceptSms($targetUser['telephone'], $reportData['user_mobile']);
 
         return success('ok');
     }
@@ -167,7 +167,7 @@ class ReportModel extends Crud {
             $condition += $adminCondition;
         }
 
-        if (!$reportData = $this->find($condition, 'id,group_id,law_id,colleague_id,location,user_id,status')) {
+        if (!$reportData = $this->find($condition, 'id,group_id,law_id,user_mobile,colleague_id,location,user_id,status')) {
             return error('案件未找到');
         }
 
@@ -194,6 +194,8 @@ class ReportModel extends Crud {
         (new WordModel())->removeDocFile($post['report_id'], 'paynote');
 
         // todo 通知用户
+        (new MsgModel())->sendReportPaySms($reportData['user_mobile'], $reportData['group_id'], $reportData['id']);
+
         return success('ok');
     }
 
@@ -211,23 +213,24 @@ class ReportModel extends Crud {
         $post['involved_act'] = trim_space($post['involved_act'], 0, 200);
         $post['extra_info'] = trim_space($post['extra_info'], 0, 200);
 
-        if (!$reportInfo = $this->find(['id' => $post['report_id'], 'law_id' => $this->userInfo['id'], 'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]]], 'id')) {
+        if (!$this->count(['id' => $post['report_id'], 'law_id' => $this->userInfo['id'], 'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]]])) {
             return error('案件未找到');
         }
 
         // 检查赔付清单
         foreach ($post['items'] as $k => $v) {
             $post['items'][$k]['property_id'] = intval($v['property_id']);
+            $post['items'][$k]['name'] = trim_space($v['name'], 0, 30);
             $post['items'][$k]['price'] = intval(floatval($v['price']) * 100); // 转成分
             $post['items'][$k]['amount'] = intval($v['amount']);
-            if (!$post['items'][$k]['property_id'] || $post['items'][$k]['price'] < 0 || $post['items'][$k]['amount'] <= 0) {
+            if (!$post['items'][$k]['property_id'] || !$post['items'][$k]['name'] || $post['items'][$k]['price'] < 0 || $post['items'][$k]['amount'] <= 0) {
                 unset($post['items'][$k]);
             }
         }
 
         $items = [];
         if ($post['items']) {
-            if (!$properties = (new PropertyModel())->select(['id' => ['in', array_column($post['items'], 'property_id')]], 'id,category,name,unit')) {
+            if (!$properties = (new PropertyModel())->select(['id' => ['in', array_column($post['items'], 'property_id')]], 'id,category,unit')) {
                 return error('获取路产项目失败');
             }
             $properties = array_column($properties, null, 'id');
@@ -237,8 +240,8 @@ class ReportModel extends Crud {
                         'report_id' => $post['report_id'],
                         'property_id' => $v['property_id'],
                         'category' => $properties[$v['property_id']]['category'],
-                        'name' => $properties[$v['property_id']]['name'],
                         'unit' => $properties[$v['property_id']]['unit'],
+                        'name' => $v['name'],
                         'price' => $v['price'],
                         'amount' => $v['amount'],
                         'total_money' => $v['price'] * $v['amount']
@@ -260,9 +263,7 @@ class ReportModel extends Crud {
                 'involved_action_type' => json_encode($post['involved_action_type']),
                 'involved_build_project' => $post['involved_build_project'],
                 'involved_act' => $post['involved_act'],
-                'extra_info' => $post['extra_info'],
-                'check_start_time' => date('Y-m-d H:i:s', TIMESTAMP - 600),
-                'check_end_time' => date('Y-m-d H:i:s', TIMESTAMP)
+                'extra_info' => $post['extra_info']
             ])) {
                 return false;
             }
@@ -485,8 +486,6 @@ class ReportModel extends Crud {
             }
             if (!$this->getDb()->table('qianxing_report_info')->insert([
                 'id' => $report_id,
-                'check_start_time' => date('Y-m-d H:i:s', TIMESTAMP - 600),
-                'check_end_time' => date('Y-m-d H:i:s', TIMESTAMP),
                 'event_time' => $userReport['create_time']
             ])) {
                 return false;
@@ -503,6 +502,9 @@ class ReportModel extends Crud {
 
         // 更新统计数
         (new UserCountModel())->setReportCount('accept', $this->userInfo['group_id'], $this->userInfo['id']);
+
+        // 推送通知
+        (new MsgModel())->sendReportAcceptSms($this->userInfo['telephone'], $userReport['user_mobile']);
 
         return success(['report_id' => $report_id]);
     }
@@ -552,7 +554,7 @@ class ReportModel extends Crud {
         $fields = null;
         if ($post['data_type'] == 'info') {
             // 报送信息
-            $fields = 'event_time,weather,car_type,event_type,driver_state,car_state,traffic_state,pass_time';
+            $fields = 'check_start_time,event_time,weather,car_type,event_type,driver_state,car_state,traffic_state,pass_time';
         } else if ($post['data_type'] == 'card') {
             // 当事人信息
             $fields = 'addr,full_name,idcard,gender,birthday,plate_num,car_type';
@@ -630,19 +632,21 @@ class ReportModel extends Crud {
      */
     public function reportInfo (array $post)
     {
-        $post['report_id']     = intval($post['report_id']);
-        $post['location']      = LocationUtils::checkLocation($post['location']);
-        $post['address']       = trim_space($post['address'], 0, 100);
-        $post['colleague_id']  = intval($post['colleague_id']); 
-        $post['stake_number']  = trim_space($post['stake_number'], 0, 100);
-        $post['event_time']    = strtotime($post['event_time']) ? $post['event_time'] : null;
-        $post['weather']       = Weather::format($post['weather']);
-        $post['car_type']      = CarType::format($post['car_type']);
-        $post['event_type']    = EventType::format($post['event_type']);
-        $post['driver_state']  = DriverState::format($post['driver_state']);
-        $post['car_state']     = CarState::format($post['car_state']);
+        $post['report_id'] = intval($post['report_id']);
+        $post['location'] = \app\library\LocationUtils::checkLocation($post['location']);
+        $post['address'] = trim_space($post['address'], 0, 100);
+        $post['colleague_id'] = intval($post['colleague_id']); 
+        $post['stake_number'] = trim_space($post['stake_number'], 0, 100);
+        $post['event_time'] = strtotime($post['event_time']) ? $post['event_time'] : null;
+        $post['weather'] = Weather::format($post['weather']);
+        $post['car_type'] = CarType::format($post['car_type']);
+        $post['event_type'] = EventType::format($post['event_type']);
+        $post['driver_state'] = DriverState::format($post['driver_state']);
+        $post['car_state'] = CarState::format($post['car_state']);
         $post['traffic_state'] = TrafficState::format($post['traffic_state']);
-        $post['pass_time']     = intval($post['pass_time']);
+        $post['pass_time'] = intval($post['pass_time']);
+        $post['check_start_time'] = strtotime($post['check_start_time']);
+        $post['check_start_time'] = $post['check_start_time'] ? $post['check_start_time'] : TIMESTAMP;
 
         if (!$post['location'] || !$post['address']) {
             return error('请定位位置');
@@ -660,7 +664,7 @@ class ReportModel extends Crud {
         if (!$report_id = $this->getDb()->transaction(function ($db) use ($post) {
             if ($post['report_id']) {
                 // 更新案件
-                if (false === $this->getDb()->where(['id' => $post['report_id'], 'status' => ReportStatus::ACCEPT])->update([
+                if (false === $this->getDb()->where(['id' => $post['report_id'], 'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]]])->update([
                     'location' => $post['location'],
                     'address' => $post['address'],
                     'stake_number' => $post['stake_number'],
@@ -677,7 +681,9 @@ class ReportModel extends Crud {
                     'driver_state' => $post['driver_state'],
                     'car_state' => $post['car_state'],
                     'traffic_state' => $post['traffic_state'],
-                    'pass_time' => $post['pass_time']
+                    'pass_time' => $post['pass_time'],
+                    'check_start_time' => date('Y-m-d H:i:00', $post['check_start_time']),
+                    'check_end_time' => date('Y-m-d H:i:00', $post['check_start_time'] + 600)
                 ])) {
                     return false;
                 }
@@ -707,8 +713,8 @@ class ReportModel extends Crud {
                     'car_state' => $post['car_state'],
                     'traffic_state' => $post['traffic_state'],
                     'pass_time' => $post['pass_time'],
-                    'check_start_time' => date('Y-m-d H:i:s', TIMESTAMP - 600),
-                    'check_end_time' => date('Y-m-d H:i:s', TIMESTAMP)
+                    'check_start_time' => date('Y-m-d H:i:00', $post['check_start_time']),
+                    'check_end_time' => date('Y-m-d H:i:00', $post['check_start_time'] + 600)
                 ])) {
                     return false;
                 }
@@ -718,6 +724,11 @@ class ReportModel extends Crud {
             return error('案件保存失败');
         }
 
+        if (!$post['report_id']) {
+            // 更新统计数
+            (new UserCountModel())->setReportCount('old', null, $this->userInfo['id']);
+        }
+        
         return success(['report_id' => $report_id]);
     }
 
@@ -768,9 +779,7 @@ class ReportModel extends Crud {
                 'car_type' => $post['car_type'],
                 'idcard' => $post['idcard'],
                 'gender' => $post['gender'],
-                'birthday' => $post['birthday'],
-                'check_start_time' => date('Y-m-d H:i:s', TIMESTAMP - 600),
-                'check_end_time' => date('Y-m-d H:i:s', TIMESTAMP)
+                'birthday' => $post['birthday']
             ])) {
                 return false;
             }
@@ -783,8 +792,8 @@ class ReportModel extends Crud {
             // 更新当事人账号信息
             $userModel->updateUserInfo($userInfo['id'], [
                 'full_name' => $post['full_name'],
-                'idcard'    => $post['idcard'],
-                'gender'    => $post['gender'],
+                'idcard' => $post['idcard'],
+                'gender' => $post['gender'],
             ]);
         }
 
@@ -814,34 +823,6 @@ class ReportModel extends Crud {
         (new UserCountModel())->setReportCount('complete', null, $this->userInfo['id']);
 
         return success('ok');
-    }
-
-    /**
-     * 发送小程序订阅消息
-     * @return array
-     */
-    public function sendSubscribeMessage ($user_id, $template_name, $page, array $value)
-    {
-        if (!$openid = (new UserModel())->getWxOpenId($user_id, 'mp')) {
-            return error('openid为空');
-        }
-        $wxConfig = getSysConfig('qianxing', 'wx');
-        if (!isset($wxConfig['template_id'][$template_name]) ||
-            !$wxConfig['template_id'][$template_name]['id']  ||
-            !$wxConfig['template_id'][$template_name]['data']) {
-            return error('模板消息参数为空');
-        }
-        $jssdk = new \app\library\JSSDK($wxConfig['appid'], $wxConfig['appsecret']);
-        $data = $wxConfig['template_id'][$template_name]['data'];
-        foreach ($data as $k => $v) {
-            $data[$k]['value'] = template_replace($v['value'], $value);
-        }
-        return $jssdk->sendMiniprogramSubscribeMessage([
-            'openid' => $openid,
-            'template_id' => $wxConfig['template_id'][$template_name]['id'],
-            'page' => $page,
-            'data' => $data
-        ]);
     }
 
 }
