@@ -11,7 +11,6 @@ class BannerModel extends Crud {
     /**
      * 获取 banner
      * @return array
-     * }
      */
     public function getBanner ()
     {

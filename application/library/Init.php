@@ -79,7 +79,8 @@ class Controller {
 
     public function raw ()
     {
-        if ($this->isCli()) {
+        if ('cli' === php_sapi_name()) {
+            // eg: $ php index.php -c=index -a=index -g={}
             $options = getopt('c:a:g::p::');
             $_GET['c'] = $options['c'];
             $_GET['a'] = $options['a'];
@@ -96,11 +97,6 @@ class Controller {
             }
             unset($data);
         }
-    }
-
-    public function isCli()
-    {
-        return 'cli' === php_sapi_name() ? true : false;
     }
 
     public function run ()
@@ -677,7 +673,7 @@ class DebugLog {
      * 输出日志
      */
     public static function _show() {
-        if (isset($_GET['__debug']) && $_GET['__debug'] === DEBUG_PASS) {
+        if (isset($_GET['__debug'])) {
             // 界面上可视化模式输出内容
             self::showViews();
         } else {
@@ -686,20 +682,13 @@ class DebugLog {
     }
 
     private function showViews() {
-        echo 'HtmlView';
     }
 
     private function writeLogs() {
         if (self::$debug) {
-            if (DEBUG_LEVEL >= 3) {
-                self::_header();
-            }
-            if (DEBUG_LEVEL >= 2) {
-                self::_post();
-            }
-            if (DEBUG_LEVEL >= 1) {
-                self::_log(array_merge(self::$info, self::$curl, self::$mysql), 'debug', true, 'Ym_Ymd', true, true);
-            }
+            self::_header();
+            self::_post();
+            self::_log(array_merge(self::$info, self::$curl, self::$mysql), 'debug', true, 'Ym_Ymd', true, true);
         }
         if (self::$error) {
             self::_log(self::$error, 'error');

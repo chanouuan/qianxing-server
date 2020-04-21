@@ -497,18 +497,17 @@ class AdminModel extends Crud {
     {
         $userInfo = $this->checkAdminInfo($user_id);
 
-        $post['id']      = intval($post['id']);
-        $post['status']  = intval($post['status']);
+        $post['id'] = intval($post['id']);
+        $post['status'] = CommonStatus::format($post['status']);
         $post['role_id'] = get_short_array($post['role_id']);
 
         $data = [];
         $data['group_id'] = $userInfo['group_id'];
         $data['user_name'] = trim_space($post['user_name'], 0, 20);
-        $data['password']  = trim_space($post['password'], 0, 32);
-        $data['gender']    = Gender::format($post['gender']);
-        $data['telephone'] = trim_space($post['telephone'], 0, 11);
+        $data['password'] = trim_space($post['password'], 0, 32);
+        $data['gender'] = Gender::format($post['gender']);
         $data['full_name'] = trim_space($post['full_name'], 0, 20);
-        $data['title']     = trim_space($post['title'], 0, 20);
+        $data['title'] = trim_space($post['title'], 0, 20);
 
         if (!$data['group_id']) {
             return error('单位不能为空');
@@ -550,16 +549,14 @@ class AdminModel extends Crud {
         if ($this->count($condition)) {
             return error('该登录账号已存在');
         }
-        if ($data['telephone']) {
-            $condition = [
-                'telephone' => $data['telephone']
-            ];
-            if ($post['id']) {
-                 $condition['id'] = ['<>', $post['id']];
-            }
-            if ($this->count($condition)) {
-                return error('该手机号已存在');
-            }
+        $condition = [
+            'telephone' => $data['telephone']
+        ];
+        if ($post['id']) {
+             $condition['id'] = ['<>', $post['id']];
+        }
+        if ($this->count($condition)) {
+            return error('该手机号已存在');
         }
 
         // 角色效验
@@ -570,19 +567,25 @@ class AdminModel extends Crud {
 
         // 新增 or 编辑
         if ($post['id']) {
-            if (!is_null(CommonStatus::format($post['status']))) {
-                $data['status'] = $post['status'];
-            }
+            $data['status'] = $post['status'];
             $data['update_time'] = date('Y-m-d H:i:s', TIMESTAMP);
             if (!$this->getDb()->where(['id' => $post['id']])->update($data)) {
                 return error('该用户已存在！');
             }
         } else {
+            $data['status'] = 1;
             $data['create_time'] = date('Y-m-d H:i:s', TIMESTAMP);
             if (!$post['id'] = $this->getDb()->insert($data, true)) {
                 return error('请勿添加重复的用户！');
             }
         }
+
+        // 更新用户信息
+        (new UserModel())->updateUserInfo(['telephone' => $data['telephone']], [
+            'full_name' => $data['full_name'],
+            'gender' => $data['gender'],
+            'group_id' => $data['status'] == 1 ? $data['group_id'] : 0
+        ]);
 
         // 添加权限
         $roles = $this->getDb()->table('admin_role_user')->field('role_id')->where(['user_id' => $post['id']])->select();

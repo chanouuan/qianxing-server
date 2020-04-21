@@ -28,7 +28,7 @@ class MsgModel extends Crud {
             'type' => \app\common\ReportType::getMessage($templete_params['report_type'])
         ];
         $params = array_fill(0, count($telephone), $params);
-        return (new AliSmsHelper())->sendBatchSms('扶桑云医', 'SMS_133971610', $telephone, $params);
+        return (new AliSmsHelper())->sendBatchSms('黔中行', 'SMS_188556034', $telephone, $params);
     }
 
     /**
@@ -42,7 +42,7 @@ class MsgModel extends Crud {
             'date' => date('Y年m月d日 H时i分', TIMESTAMP),
             'phone' => $param_phone
         ];
-        return (new AliSmsHelper())->sendSms('扶桑云医', 'SMS_133971610', $user_phone, $params);
+        return (new AliSmsHelper())->sendSms('黔中行', 'SMS_188570794', $user_phone, $params);
     }
 
     /**
@@ -52,17 +52,16 @@ class MsgModel extends Crud {
      */
     public function sendReportPaySms ($user_phone, int $group_id, int $report_id)
     {
-        $groupInfo = (new GroupModel())->find(['id' => $group_id], 'name,address,phone');
+        $groupInfo = (new GroupModel())->find(['id' => $group_id], 'name,phone');
         $reportInfo = $this->getDb()->table('qianxing_report_info')->field('full_name,plate_num')->where(['id' => $report_id])->find();
         $params = [
             'date' => date('Y年m月d日 H时i分', TIMESTAMP),
-            'full_name' => $reportInfo['full_name'],
-            'plate_num' => $reportInfo['plate_num'],
-            'group_name' => $groupInfo['name'],
-            'group_phone' => $groupInfo['phone'],
-            'group_addr' => $groupInfo['address']
+            'name' => $reportInfo['full_name'],
+            'car' => $reportInfo['plate_num'],
+            'group' => $groupInfo['name'],
+            'phone' => $groupInfo['phone']
         ];
-        return (new AliSmsHelper())->sendSms('扶桑云医', 'SMS_133971610', $user_phone, $params);
+        return (new AliSmsHelper())->sendSms('黔中行', 'SMS_188551111', $user_phone, $params);
     }
 
     /**
@@ -77,9 +76,10 @@ class MsgModel extends Crud {
         $reportInfo = $this->getDb()->table('qianxing_report_info')->field('archive_num')->where(['id' => $report_id])->find();
         $params = [
             'date' => date('Y年m月d日 H时i分', TIMESTAMP),
-            'name' => $groupInfo['way_name'] . '赔[' . date('Y', TIMESTAMP) . ']' . $reportInfo['archive_num'] . '号',
+            'name' => $groupInfo['way_name'],
+            'num' => '[' . date('Y', TIMESTAMP) . ']' . $reportInfo['archive_num']
         ];
-        return (new AliSmsHelper())->sendSms('扶桑云医', 'SMS_133971610', $userInfo['telephone'], $params);
+        return (new AliSmsHelper())->sendSms('黔中行', 'SMS_188565950', $userInfo['telephone'], $params);
     }
 
     /**
@@ -88,7 +88,7 @@ class MsgModel extends Crud {
      */
     public function sendCode ($phone, $code)
     {
-        return (new AliSmsHelper())->sendSms('扶桑云医', 'SMS_133971610', $phone, ['code' => $code]);
+        return (new AliSmsHelper())->sendSms('黔中行', 'SMS_133971610', $phone, ['code' => $code]);
     }
 
 }

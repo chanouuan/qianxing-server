@@ -10,17 +10,15 @@ if (isset($_SERVER['PATH_INFO'])) {
 }
 
 header('Access-Control-Allow-Origin: *');
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 	http_response_code(200);
     exit(0);
 }
 
 define('APPLICATION_PATH', dirname(__DIR__));
-define('APPLICATION_URL', rtrim(implode('', [$_SERVER['REQUEST_SCHEME'], '://', $_SERVER['HTTP_HOST'], str_replace('index.php', '', $_SERVER['SCRIPT_NAME'])]), '/'));
+define('APPLICATION_URL', isset($_SERVER['HTTP_HOST']) ? rtrim(implode('', [$_SERVER['REQUEST_SCHEME'], '://', $_SERVER['HTTP_HOST'], str_replace('index.php', '', $_SERVER['SCRIPT_NAME'])]), '/') : null);
 define('TIMESTAMP', $_SERVER['REQUEST_TIME']);
 define('MICROTIME', isset($_SERVER['REQUEST_TIME_FLOAT']) ? $_SERVER['REQUEST_TIME_FLOAT'] : microtime(true));
-define('DEBUG_PASS', '__debug');
-define('DEBUG_LEVEL', 3);
 if (isset($_SERVER['HTTP_APIVERSION'])) {
     define('APIVERSION', 'v' . intval($_SERVER['HTTP_APIVERSION']));
 } else if (isset($_POST['apiversion'])) {
