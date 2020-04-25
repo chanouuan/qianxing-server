@@ -102,9 +102,9 @@ class AdminModel extends Crud {
         }
 
         return success([
-            'user_id'   => $userInfo['id'],
-            'avatar'    => httpurl($userInfo['avatar']),
-            'nick_name'  => get_real_val($userInfo['full_name'], $userInfo['user_name'], $userInfo['telephone']),
+            'user_id' => $userInfo['id'],
+            'avatar' => httpurl($userInfo['avatar']),
+            'nick_name' => get_real_val($userInfo['full_name'], $userInfo['user_name'], $userInfo['telephone']),
             'telephone' => $userInfo['telephone']
         ]);
     }
@@ -184,6 +184,24 @@ class AdminModel extends Crud {
     }
 
     /**
+     * 修改密码
+     * @return array
+     */
+    public function editPwd (int $user_id, array $post)
+    {
+        if (strlen($post['password']) < 6) {
+            return error('密码长度至少 6 位');
+        }
+        $post['password'] = $this->hashPassword(md5($post['password']));
+
+        if (false === $this->getDb()->where(['id' => $user_id])->update(['password' => $post['password']])) {
+            return error('更新数据失败');
+        }
+
+        return success('ok');
+    }
+
+    /**
      * 获取用户信息
      * @return array
      */
@@ -249,6 +267,7 @@ class AdminModel extends Crud {
         $userInfo = $this->checkAdminInfo($user_id);
 
         $condition = [
+            'id' => ['>1'],
             'group_id' => $userInfo['group_id']
         ];
         if ($post['name']) {
@@ -261,7 +280,7 @@ class AdminModel extends Crud {
         $count = $this->getDb()->table('admin_roles')->where($condition)->count();
         if ($count > 0) {
             $pagesize = getPageParams($post['page'], $count, $post['page_size']);
-            $list = $this->getDb()->field('id,name,description,status')->table('admin_roles')->where($condition)->order('id desc')->limit($pagesize['limitstr'])->select();
+            $list = $this->getDb()->field('id,name,is_sys,description,status')->table('admin_roles')->where($condition)->order('id desc')->limit($pagesize['limitstr'])->select();
         }
 
         return success([
@@ -323,7 +342,7 @@ class AdminModel extends Crud {
                 unset($post['permission'][$k]);
             }
         }
-        $post['permission'] = array_values($post['permission']);
+        $post['permission'] = array_map('intval', array_unique(array_filter(array_values($post['permission']))));
 
         $data = [];
         $data['group_id'] = $userInfo['group_id'];
@@ -396,7 +415,7 @@ class AdminModel extends Crud {
     public function getPeopleInfo ($id)
     {
         $id = intval($id);
-        if (!$info = $this->getDb()->field('id,avatar,user_name,full_name,telephone,gender,title,status')->where(['id' => $id])->limit(1)->find()) {
+        if (!$info = $this->getDb()->field('id,avatar,user_name,full_name,telephone,gender,title,law_num,status')->where(['id' => $id])->limit(1)->find()) {
             return [];
         }
         // 获取角色
@@ -420,6 +439,7 @@ class AdminModel extends Crud {
         $userInfo = $this->checkAdminInfo($user_id);
 
         $condition = [
+            'id' => ['>3'],
             'group_id' => $userInfo['group_id']
         ];
         if (!is_null(CommonStatus::format($post['status']))) {
@@ -443,7 +463,7 @@ class AdminModel extends Crud {
         $count = $this->count($condition);
         if ($count > 0) {
             $pagesize = getPageParams($post['page'], $count, $post['page_size']);
-            $list = $this->select($condition, 'id,user_name,telephone,full_name,gender,title,status', 'id desc', $pagesize['limitstr']);
+            $list = $this->select($condition, 'id,user_name,telephone,full_name,gender,title,law_num,status', 'id desc', $pagesize['limitstr']);
             if ($list) {
                 $roles = $this->getRoleByUser(array_column($list, 'id'));
                 foreach ($list as $k => $v) {
@@ -490,43 +510,72 @@ class AdminModel extends Crud {
     }
 
     /**
+     * 删除人员
+     * @return array
+     */
+    public function delPeople (int $user_id, $id)
+    {
+        $userInfo = $this->checkAdminInfo($user_id);
+
+        $id = intval($id);
+
+        if ($id <= 3) {
+            return error('不能操作系统用户');
+        }
+
+        if (!$adminInfo = $this->find(['id' => $id, 'group_id' => $userInfo['group_id']], 'telephone')) {
+            return error('未找到该用户');
+        }
+
+        if (!$this->getDb()->where(['id' => $id, 'group_id' => $userInfo['group_id']])->delete()) {
+            return error('删除数据失败');
+        }
+
+        // 删除权限
+        $this->getDb()->table('admin_role_user')->where(['user_id' => $id])->delete();
+
+        // 更新用户信息
+        if ($adminInfo['telephone']) {
+            (new UserModel())->updateUserInfo(['telephone' => $adminInfo['telephone']], ['group_id' => 0]);
+        }
+
+        return success('ok');
+    }
+
+    /**
      * 添加人员
      * @return array
      */
-    public function savePeople (int $user_id, array $post)
+    public function savePeople (int $user_id, array $post, $import_group_id = null)
     {
         $userInfo = $this->checkAdminInfo($user_id);
 
         $post['id'] = intval($post['id']);
         $post['status'] = CommonStatus::format($post['status']);
         $post['role_id'] = get_short_array($post['role_id']);
+        $post['role_id'] = array_map('intval', array_unique(array_filter($post['role_id'])));
 
         $data = [];
-        $data['group_id'] = $userInfo['group_id'];
+        $data['group_id'] = $import_group_id ? $import_group_id : $userInfo['group_id'];
         $data['user_name'] = trim_space($post['user_name'], 0, 20);
+        $data['telephone'] = $post['telephone'];
         $data['password'] = trim_space($post['password'], 0, 32);
         $data['gender'] = Gender::format($post['gender']);
         $data['full_name'] = trim_space($post['full_name'], 0, 20);
         $data['title'] = trim_space($post['title'], 0, 20);
+        $data['law_num'] = trim_space($post['law_num'], 0, 8);
 
         if (!$data['group_id']) {
             return error('单位不能为空');
         }
-        if (!$data['user_name']) {
-            return error('登录账号不能为空');
-        } else {
-            if (preg_match('/^\d+$/', $post['user_name'])) {
-                return error('登录账号不能全数字');
-            }
+        if ($data['user_name'] && preg_match('/^\d+$/', $post['user_name'])) {
+            return error('登录账号不能全数字');
         }
         if (!$post['id'] && !$data['password']) {
             return error('登录密码不能为空');
         }
         if (!validate_telephone($data['telephone'])) {
             return error('手机号格式不正确');
-        }
-        if (!$post['role_id']) {
-            return error('角色不能为空');
         }
 
         // 密码 hash
@@ -540,14 +589,16 @@ class AdminModel extends Crud {
         }
 
         // 重复效验
-        $condition = [
-            'user_name' => $data['user_name']
-        ];
-        if ($post['id']) {
-             $condition['id'] = ['<>', $post['id']];
-        }
-        if ($this->count($condition)) {
-            return error('该登录账号已存在');
+        if ($data['user_name']) {
+            $condition = [
+                'user_name' => $data['user_name']
+            ];
+            if ($post['id']) {
+                 $condition['id'] = ['<>', $post['id']];
+            }
+            if ($this->count($condition)) {
+                return error('该登录账号已存在');
+            }
         }
         $condition = [
             'telephone' => $data['telephone']
@@ -559,18 +610,21 @@ class AdminModel extends Crud {
             return error('该手机号已存在');
         }
 
-        // 角色效验
-        $roles = $this->getDb()->table('admin_roles')->where(['status' => 1, 'id' => ['in', $post['role_id']]])->count();
-        if (count($post['role_id']) !== $roles) {
-            return error('角色效验失败');
-        }
+        $userModel = new UserModel();
 
         // 新增 or 编辑
         if ($post['id']) {
+            $adminInfo = $this->find(['id' => $post['id']], 'telephone');
             $data['status'] = $post['status'];
             $data['update_time'] = date('Y-m-d H:i:s', TIMESTAMP);
             if (!$this->getDb()->where(['id' => $post['id']])->update($data)) {
                 return error('该用户已存在！');
+            }
+            // 更新原手机号用户信息
+            if ($adminInfo['telephone'] != $data['telephone']) {
+                $userModel->updateUserInfo(['telephone' => $adminInfo['telephone']], [
+                    'group_id' => 0
+                ]);
             }
         } else {
             $data['status'] = 1;
@@ -581,11 +635,13 @@ class AdminModel extends Crud {
         }
 
         // 更新用户信息
-        (new UserModel())->updateUserInfo(['telephone' => $data['telephone']], [
-            'full_name' => $data['full_name'],
-            'gender' => $data['gender'],
-            'group_id' => $data['status'] == 1 ? $data['group_id'] : 0
-        ]);
+        if ($data['telephone']) {
+            $userModel->updateUserInfo(['telephone' => $data['telephone']], [
+                'full_name' => $data['full_name'],
+                'gender' => $data['gender'],
+                'group_id' => $data['status'] == 1 ? $data['group_id'] : 0
+            ]);
+        }
 
         // 添加权限
         $roles = $this->getDb()->table('admin_role_user')->field('role_id')->where(['user_id' => $post['id']])->select();

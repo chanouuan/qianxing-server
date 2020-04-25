@@ -13,46 +13,13 @@ class UserCountModel extends Crud {
      * 更新 report_count 字段
      * @return array
      */
-    public function setReportCount ($op, $group_id, $user_id = null, $old_group_id = null, $old_user_id = null)
+    public function setReportCount ($user_id = null, $old_user_id = null)
     {
-        $groupModel = new GroupModel();
-        $userModel = new UserModel();
-
-        if ($op == 'new') {
-            $users = $userModel->select(['group_id' => $group_id], 'id');
-            if ($users) {
-                $users = array_column($users, 'id');
-                $this->updateSet($users, ['report_count' => ['report_count+1']]);
-            }
-        } else if ($op == 'old') {
-            if ($group_id) {
-                $users = $userModel->select(['group_id' => $group_id], 'id');
-                if ($users) {
-                    $users = array_column($users, 'id');
-                    $this->updateSet($users, ['report_count' => ['report_count+1']]);
-                }
-            }
-            if ($old_group_id) {
-                $users = $userModel->select(['group_id' => $old_group_id], 'id');
-                if ($users) {
-                    $users = array_column($users, 'id');
-                    $this->updateSet($users, ['report_count' => ['if(report_count>0,report_count-1,0)']]);
-                }
-            }
-            if ($user_id) {
-                $this->updateSet($user_id, ['report_count' => ['report_count+1']]);
-            }
-            if ($old_user_id) {
-                $this->updateSet($old_user_id, ['report_count' => ['if(report_count>0,report_count-1,0)']]);
-            }
-        } else if ($op == 'accept') {
-            $users = $userModel->select(['group_id' => $group_id, 'id' => ['<>', $user_id]], 'id');
-            if ($users) {
-                $users = array_column($users, 'id');
-                $this->updateSet($users, ['report_count' => ['if(report_count>0,report_count-1,0)']]);
-            }
-        } else if ($op == 'complete') {
-            $this->updateSet($user_id, ['report_count' => ['if(report_count>0,report_count-1,0)']]);
+        if ($user_id) {
+            $this->updateSet($user_id, ['report_count' => ['report_count+1']]);
+        }
+        if ($old_user_id) {
+            $this->updateSet($old_user_id, ['report_count' => ['if(report_count>0,report_count-1,0)']]);
         }
     }
 

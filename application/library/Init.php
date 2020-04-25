@@ -265,7 +265,7 @@ abstract class ActionPDO {
             return false;
         }
         $clienttype = $clienttype ? $clienttype : ($client ? $client : (defined('CLIENT_TYPE') ? CLIENT_TYPE : ''));
-        return \app\library\DB::getInstance()->field('user_id,clienttype,clientapp,stoken')
+        return \app\library\DB::getInstance()->field('user_id,clienttype,clientapp,stoken,update_time')
             ->table('__tablepre__session')
             ->where('user_id = ? and clienttype = ? and scode = ?')
             ->bindValue($user_id, $clienttype, $scode)

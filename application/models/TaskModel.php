@@ -44,16 +44,6 @@ class TaskModel extends Crud {
             'status' => \app\common\ReportStatus::WAITING,
             'create_time' => ['<', date('Y-m-d H:i:s', TIMESTAMP - 86400)]
         ];
-        $list = $this->getDb()
-            ->table('qianxing_user_report')
-            ->field('group_id,count(*) as count')
-            ->where($condition)
-            ->group('group_id')
-            ->select();
-        if (!$list) {
-            return false;
-        }
-
         // 删除24小时后未受理的报案
         if (!$this->getDb()
             ->table('qianxing_user_report')
@@ -61,18 +51,6 @@ class TaskModel extends Crud {
             ->delete()) {
             return false;
         }
-
-        // 更新统计数
-        $userCountModel = new UserCountModel();
-        $userModel = new UserModel();
-        foreach ($list as $k => $v) {
-            $users = $userModel->select(['group_id' => $v['group_id']], 'id');
-            if ($users) {
-                $users = array_column($users, 'id');
-                $userCountModel->updateSet($users, ['report_count' => ['if(report_count>' . $v['count'] . ',report_count-' . $v['count'] . ',0)']]);
-            }
-        }
-
         return true;
     }
 

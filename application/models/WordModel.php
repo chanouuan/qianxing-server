@@ -143,7 +143,7 @@ class WordModel extends Crud {
 
         $reportData += $this->getDb()->table('qianxing_report_info')->where(['id' => $reportData['id']])->limit(1)->find();
 
-        $reportData['gender'] = Gender::getMessage($reportData['gender']);
+        $reportData['gender'] = Gender::getMessage($reportData['gender']);      
 
         // 路产受损赔付清单
         $reportData['items'] = $this->getDb()->field('name,unit,price,amount,total_money')->table('qianxing_report_item')->where(['report_id' => $reportData['id']])->select();

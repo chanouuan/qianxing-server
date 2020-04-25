@@ -1124,7 +1124,7 @@ function array_key_clean (array $input, array $only = [], array $except = [])
 
 function get_short_array ($input, $delimiter = ',', $length = 200)
 {
-    return is_string($input) ? explode($delimiter, trim(mb_substr($input, 0, $length), $delimiter)) : [];
+    return $input ? explode($delimiter, trim(mb_substr($input, 0, $length), $delimiter)) : [];
 }
 
 function get_list_dir ($root, $paths = [])

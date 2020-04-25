@@ -14,12 +14,30 @@ class MsgModel extends Crud {
      */
     public function sendReportEventSms (int $group_id, array $templete_params)
     {
-        // 可优化按指定职位
-        if (!$telephone = (new AdminModel())->select(['group_id' => $group_id], 'telephone')) {
+        // 按指定职位 外勤
+        $adminUsers = $this->getDb()
+            ->table('admin_roles role inner join admin_role_user user on user.role_id = role.id')
+            ->field('user.user_id')
+            ->where(['role.name' => '外勤', 'role.group_id' => $group_id, 'role.is_sys' => 1])
+            ->select();
+        if (!$adminUsers) {
+            return false;
+        }
+        if (!$telephone = (new AdminModel())->select(['group_id' => $group_id, 'status' => 1, 'id' => ['in', array_column($adminUsers, 'user_id')]], 'telephone')) {
             return error('未找到接收人');
         }
         if (!$telephone = array_filter(array_column($telephone, 'telephone'))) {
             return error('未找到接收人');
+        }
+        // 报警通知开关
+        $enableTel = (new UserModel())->select(['allow_notice' => 0, 'telephone' => ['in', $telephone]], 'telephone');
+        if ($enableTel) {
+            $enableTel = array_column($enableTel, 'telephone');
+            // 去掉关闭通知的用户
+            $telephone = array_diff($telephone, $enableTel);
+        }
+        if (!$telephone) {
+            return error('没有接收人');
         }
         $params = [
             'date' => date('Y年m月d日 H时i分', TIMESTAMP),
@@ -29,6 +47,21 @@ class MsgModel extends Crud {
         ];
         $params = array_fill(0, count($telephone), $params);
         return (new AliSmsHelper())->sendBatchSms('黔中行', 'SMS_188556034', $telephone, $params);
+    }
+
+    /**
+     * 通知报案人已受理案件
+     * xxxx年xx月xx日 xx时xx分，xxx大队已受理报案。请开启危险报警闪烁灯，夜间还需开启示轮廓灯，请在车后方放置警示牌，人员请撤离防护带以外，等待救援。
+     * @return array
+     */
+    public function sendUserAcceptSms ($user_phone, $group_id)
+    {
+        $groupInfo = (new GroupModel())->find(['id' => $group_id], 'name,phone');
+        $params = [
+            'date' => date('Y年m月d日 H时i分', TIMESTAMP),
+            'group' => $groupInfo['name']
+        ];
+        return (new AliSmsHelper())->sendSms('黔中行', 'SMS_188990694', $user_phone, $params);
     }
 
     /**

@@ -106,7 +106,7 @@ class AdminReportModel extends Crud {
             } else {
                 $userCondition['full_name'] = $post['law_name'];
             }
-            if (!$data = (new AdminModel())->find($userCondition, 'id')) {
+            if (!$data = (new UserModel())->find($userCondition, 'id')) {
                 return success([
                     'total_count' => 0,
                     'page_size' => $post['page_size'],
@@ -132,7 +132,7 @@ class AdminReportModel extends Crud {
                          ->order('report.id desc')
                          ->limit($pagesize['limitstr'])
                          ->select();
-            $userNames = (new AdminModel())->getAdminNames(array_column($list, 'law_id'));
+            $userNames = (new UserModel())->getUserNames(array_column($list, 'law_id'));
             foreach ($list as $k => $v) {
                 $list[$k]['pay'] = round_dollar($v['pay']);
                 $list[$k]['cash'] = round_dollar($v['cash']);
@@ -278,8 +278,7 @@ class AdminReportModel extends Crud {
         }
 
         if ($post['money'] === $discost) {
-            // 推送通知
-            (new MsgModel())->sendReportCompleteSms($reportData['law_id'], $reportData['id']);
+            (new ReportModel())->reportCompleteCall($reportData['id']);
         }
 
         return success('ok');

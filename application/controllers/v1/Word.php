@@ -62,12 +62,16 @@ class Word extends ActionPDO {
      */
     public function allnote ()
     {
-        $userInfo = (new \app\models\AdminModel())->checkAdminInfo($this->_G['user']['user_id']);
         $condition = [
             'id' => intval($_POST['report_id']),
-            'group_id' => $userInfo['group_id'],
             'status' => \app\common\ReportStatus::COMPLETE
         ];
+        if ($this->_G['user']['clienttype'] == 'mp') {
+            $condition['law_id'] = $this->_G['user']['user_id'];
+        } else {
+            $userInfo = (new \app\models\AdminModel())->checkAdminInfo($this->_G['user']['user_id']);
+            $condition['group_id'] = $userInfo['group_id'];
+        }
         return (new \app\models\WordModel())->createNote($this->_action, $condition);
     }
 

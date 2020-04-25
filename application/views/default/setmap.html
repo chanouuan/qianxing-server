@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>map</title>
+<style type="text/css">
+*{
+    margin:0px;
+    padding:0px;
+}
+body, html{
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+#container{
+    width: 70%;
+    height: 100%;
+    float: left;
+}
+#info{
+    width: 30%;
+    height: 100%;
+    float: left;
+    text-align: center;
+    line-height: 2;
+    font-size: 14px;
+}
+</style>
+<script charset="utf-8" src="https://map.qq.com/api/js?v=2.exp&key=RJABZ-M7ZWS-MVAOZ-6X3DM-27WKO-D4F5G"></script>
+<script>
+var select = 'from';
+var polyline = null;
+function getpoint(str){
+    select = str
+}
+function driving(){
+    var from = document.getElementById('from_point').value;
+    var to = document.getElementById('to_point').value;
+    var heading = document.getElementById('heading').value;
+    var name = document.getElementById('name').value;
+    $.ajax({
+        url: '?direction=1&from='+from+'&to='+to+'&heading='+heading,
+        dataType: 'json',
+        success: function (res) {
+            if (res.errorcode !== 0) {
+                alert(JSON.stringify(res));
+                return;
+            }
+            var path = [];
+            var result = {
+                name: name,
+                start: '', 
+                end: '', 
+                points: []
+            };
+            document.getElementById('distance').innerHTML = res.data.distance;
+            document.getElementById('district').innerHTML = res.data.district;
+            res.data.pl.forEach(function (n) {
+                n[0] = n[0].toFixed(6);
+                n[1] = n[1].toFixed(6);
+                result.points.push(n.join(','));
+                path.push(new qq.maps.LatLng(n[1], n[0]))
+            });
+            polyline.setPath(path);
+            result.start = result.points[0];
+            result.end = result.points[result.points.length-1];
+            document.getElementById('result').value = JSON.stringify(result);
+        }
+    })
+}
+var init = function() {
+    var center = new qq.maps.LatLng(27.696296, 106.926498);
+    var map = new qq.maps.Map(document.getElementById('container'),{
+        center: center,
+        zoom: 11
+    });
+    map.setOptions({
+        draggableCursor: "crosshair"
+    });
+    polyline = new qq.maps.Polyline({
+        path: [],
+        strokeColor: '#09bb07',
+        strokeWeight: 5,
+        editable:false,
+        map: map
+    });
+    //绑定单击事件添加参数
+    qq.maps.event.addListener(map, 'click', function(event) {
+        document.getElementById(select + '_point').value = event.latLng.getLat().toFixed(6) + ',' + event.latLng.getLng().toFixed(6);
+    });
+};
+</script>
+</head>
+<body onload="init()">
+<div id="container"></div>
+<div id="info">
+    <div><a href="https://lbs.qq.com/tool/getpoint/index.html" target="_blank">坐标拾取</a></div>
+    <div>
+        <button type="button" onclick="getpoint('from')">拾取起点</button>
+        <button type="button" onclick="getpoint('to')">拾取终点</button>
+    </div>
+    <div>
+        起点：<input id="from_point" /></span>
+    </div>
+    <div>
+        终点：<input id="to_point" /></span>
+    </div>
+    <div>
+        距离：<span id="distance"></span>公里
+    </div>
+    <div>
+        路径区域：<span id="district"></span>
+    </div>
+    <div>
+        起点位置时的车头方向：<input type="text" id="heading" value="0"/>
+    </div>
+    <div>
+        路线名称：<input type="text" id="name" value=""/>
+    </div>
+    <div>
+        <button type="button" onclick="driving()">路径规划</button>
+    </div>
+    <div>
+        <textarea id="result" style="width:100%;height:300px;"></textarea>
+    </div>
+</div>
+
+<script src="<?=APPLICATION_URL?>/static/js/jquery-1.12.4.min.js" charset="utf-8"></script>
+
+</body>
+</html>

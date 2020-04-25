@@ -42,9 +42,6 @@ class UserReportModel extends Crud {
             return error('数据更新失败');
         }
 
-        // 更新统计数
-        (new UserCountModel())->setReportCount('old', $post['target_id'], null, $userInfo['group_id']);
-
         // todo 通知单位
         (new MsgModel())->sendReportEventSms($userInfo['group_id'], $userReport);
 
@@ -177,9 +174,6 @@ class UserReportModel extends Crud {
             return error('数据保存失败');
         }
 
-        // 更新统计数
-        (new UserCountModel())->setReportCount('new', $post['group_id']);
-
         // todo 推送消息
         (new MsgModel())->sendReportEventSms($post['group_id'], [
             'user_mobile' => $userInfo['telephone'],
@@ -198,16 +192,9 @@ class UserReportModel extends Crud {
     {
         $post['report_id'] = intval($post['report_id']);
 
-        if (!$reportInfo = $this->find(['id' => $post['report_id'], 'status' => ReportStatus::WAITING], 'id,group_id')) {
-            return error('案件未找到');
-        }
-
         if (!$this->getDb()->where(['id' => $post['report_id'], 'status' => ReportStatus::WAITING])->delete()) {
             return error('数据更新失败');
         }
-
-        // 更新统计数
-        (new UserCountModel())->setReportCount('old', null, null, $reportInfo['group_id']);
 
         return success('ok');
     }

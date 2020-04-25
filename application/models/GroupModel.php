@@ -79,7 +79,7 @@ class GroupModel extends Crud {
             return success([]);
         }
 
-        if (!$list = $this->select(['district' => $post['district']], 'id,name,route_points')) {
+        if (!$list = $this->select(['ad_info' => ['like', '%' . $post['district'] . '%']], 'id,name,route_points')) {
             return success([]);
         }
 
@@ -98,6 +98,12 @@ class GroupModel extends Crud {
                         } else {
                             $points[$v['id']] = $distance;
                         }
+                        if ($points[$v['id']] <= 10) {
+                            break;
+                        }
+                    }
+                    if (isset($points[$v['id']]) && $points[$v['id']] <= 10) {
+                        break;
                     }
                 }
                 unset($list[$k]['route_points']);
@@ -105,9 +111,19 @@ class GroupModel extends Crud {
                 unset($list[$k]);
             }
         };
+        $points = array_values($points);
+        $list = array_values($list);
+        // 去掉距离过大的
+        foreach ($points as $k => $v) {
+            if ($v > 1000) {
+                unset($points[$k]);
+                unset($list[$k]);
+            }
+        }
         // 排序距离
-        array_multisort($points, SORT_ASC, SORT_NUMERIC,  $list);
-        
+        if ($list) {
+            array_multisort($points, SORT_ASC, SORT_NUMERIC, $list);
+        }
         return success($list);
     }
 

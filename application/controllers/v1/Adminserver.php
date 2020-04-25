@@ -23,26 +23,47 @@ class Adminserver extends ActionPDO {
     public function _init()
     {
         if ($this->_G['user']) {
+            // 登录时长
+            $loginTime = strtotime($this->_G['user']['update_time']);
+            if (mktime(0, 0, 0, date('m', $loginTime), date('d', $loginTime) + 1, date('Y', $loginTime)) < TIMESTAMP) {
+                json(null, \StatusCodes::getMessage(\StatusCodes::TOKEN_VALIDATE_FAIL), \StatusCodes::TOKEN_VALIDATE_FAIL, \StatusCodes::STATUS_OK);
+            }
             // 获取权限
             $permissions = isset($this->_G['token'][4]) ? explode('^', $this->_G['token'][4]) : [];
             $permissions = \app\common\GenerateCache::mapPermissions($permissions);
             // 忽略列表
             $ignoreAccess = [
-                'getUserProfile',
+                'indexCount',
+                'editPwd',
+                'getLoginProfile',
                 'feedback'
             ];
             // 重命名
             $map = [
+                // 案件处置
                 'getReportList' => 'report',
+                'getReportDetail' => 'report',
+                'reportFile' => 'report',
+                'reportPayCash' => 'report',
+                'createArchive' => 'report',
+                // 人员管理
                 'getPeopleList' => 'people',
+                'savePeople' => 'people',
+                'delPeople' => 'people',
+                'getPeopleInfo' => 'people',
+                'getPeopleRole' => 'people',
+                // 角色管理
                 'getRoleList' => 'people',
+                'saveRole' => 'people',
+                'viewRole' => 'people',
+                'viewPermissions' => 'people'
             ];
             // 权限值
             $action = isset($map[$this->_action]) ? $map[$this->_action] : $this->_action;
             // 权限验证
             if (!in_array($action, $ignoreAccess)) {
                 if (empty(array_intersect(['ANY', $action], $permissions))) {
-                    json(null,'权限不足', 100);
+                    json(null, '权限不足', 100);
                 }
             }
         }
@@ -94,6 +115,21 @@ class Adminserver extends ActionPDO {
             $result['data']['s'] = $s * 2 + $s % 10 + 127;
         }
         return $result;
+    }
+
+    /**
+     * 修改密码
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "result":{}
+     * }
+     */
+    public function editPwd ()
+    {
+        return (new \app\models\AdminModel())->editPwd($this->_G['user']['user_id'], $_POST);
     }
 
     /**
@@ -277,6 +313,21 @@ class Adminserver extends ActionPDO {
     }
 
     /**
+     * 删除人员
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":[]
+     * }
+     */
+    public function delPeople ()
+    {
+        return (new \app\models\AdminModel())->delPeople($this->_G['user']['user_id'], $_POST['id']);
+    }
+
+    /**
      * 获取人员信息
      * @param id
      * @return array
@@ -380,6 +431,35 @@ class Adminserver extends ActionPDO {
     public function feedback ()
     {
         return (new \app\models\FeedbackModel())->feedback($this->_G['user']['user_id'], $_POST);
+    }
+
+    /**
+     * 下载模板
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "result":[]
+     * }
+     */
+    public function downloadCsvTemplate ()
+    {
+        return (new \app\models\ImportModel())->downloadCsvTemplate(getgpc('type'));
+    }
+
+    /**
+     * 导入数据
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "result":[]
+     * }
+     */
+    public function importCsv ()
+    {
+        return (new \app\models\ImportModel())->importCsv($this->_G['user']['user_id'], getgpc('type'));
     }
 
 }

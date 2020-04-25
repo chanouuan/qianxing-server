@@ -62,7 +62,7 @@ class ReportModel extends Crud {
         }
 
         // 更新统计数
-        (new UserCountModel())->setReportCount('old', null, $post['target_id'], null, $this->userInfo['id']);
+        (new UserCountModel())->setReportCount($post['target_id'], $this->userInfo['id']);
 
         // todo 通知移交人
         (new MsgModel())->sendReportAcceptSms($targetUser['telephone'], $reportData['user_mobile']);
@@ -117,6 +117,31 @@ class ReportModel extends Crud {
     }
 
     /**
+     * 案件处置完成通知
+     * @return bool
+     */
+    public function reportCompleteCall ($report_id)
+    {
+        if (!$reportData = $this->find(['id' => $report_id, 'status' => ReportStatus::COMPLETE], 'id,group_id,law_id,user_mobile,colleague_id,location,user_id')) {
+            return false;
+        }
+
+        // 更新统计数
+        $userCountModel = new UserCountModel();
+        $userCountModel->updateSet([$reportData['law_id'], $reportData['colleague_id']], [
+            'case_count' => ['case_count+1'],
+            'patrol_km' => ['patrol_km+' . (new GroupModel())->getDistance($reportData['group_id'], $reportData['location'])]
+        ]);
+        $userCountModel->updateCityRank([$reportData['law_id'], $reportData['colleague_id']], $reportData['group_id']);
+        $userCountModel->setReportCount(null, $reportData['law_id']);
+
+        // 推送通知给路政
+        (new MsgModel())->sendReportCompleteSms($reportData['law_id'], $reportData['id']);
+
+        return true;
+    }
+
+    /**
      * 获取赔偿清单
      * @return array
      */
@@ -167,7 +192,7 @@ class ReportModel extends Crud {
             $condition += $adminCondition;
         }
 
-        if (!$reportData = $this->find($condition, 'id,group_id,law_id,user_mobile,colleague_id,location,user_id,status')) {
+        if (!$reportData = $this->find($condition, 'id,group_id,user_mobile')) {
             return error('案件未找到');
         }
 
@@ -178,20 +203,9 @@ class ReportModel extends Crud {
         ])) {
             return error('数据保存失败');
         }
-
-        if ($reportData['status'] == ReportStatus::ACCEPT) {
-            // 更新统计数
-            $userCountModel = new UserCountModel();
-            $userCountModel->updateSet([$reportData['law_id'], $reportData['colleague_id']], [
-                'case_count' => ['case_count+1'],
-                'patrol_km' => ['patrol_km+' . (new GroupModel())->getDistance($reportData['group_id'], $reportData['location'])]
-            ]);
-            $userCountModel->updateCityRank([$reportData['law_id'], $reportData['colleague_id']], $reportData['group_id']);
-            $userCountModel->setReportCount('complete', null, $reportData['law_id']);
-        }
         
         // 删除赔偿通知书
-        (new WordModel())->removeDocFile($post['report_id'], 'paynote');
+        (new WordModel())->removeDocFile($reportData['id'], 'paynote');
 
         // todo 通知用户
         (new MsgModel())->sendReportPaySms($reportData['user_mobile'], $reportData['group_id'], $reportData['id']);
@@ -351,7 +365,7 @@ class ReportModel extends Crud {
             $post['report_field'] === 'signature_invitee'
             ) ? 90 : 0;
 
-        $uploadfile = uploadfile($_FILES['upfile'], 'jpg,jpeg,png', $rotate > 0 ? 0 : 750, $rotate > 0 ? 0 : 500, $rotate);
+        $uploadfile = uploadfile($_FILES['upfile'], 'jpg,jpeg,png', $rotate > 0 ? 0 : 900, $rotate > 0 ? 0 : 600, $rotate);
         if ($uploadfile['errorcode'] !== 0) {
             return $uploadfile;
         }
@@ -384,7 +398,7 @@ class ReportModel extends Crud {
             return error('图片保存失败');
         }
 
-        return success([ url => httpurl($uploadfile['url'])]);
+        return success([ 'url' => httpurl($uploadfile['url'])]);
     }
 
     /**
@@ -501,10 +515,12 @@ class ReportModel extends Crud {
         }
 
         // 更新统计数
-        (new UserCountModel())->setReportCount('accept', $this->userInfo['group_id'], $this->userInfo['id']);
+        (new UserCountModel())->setReportCount($this->userInfo['id']);
 
         // 推送通知
-        (new MsgModel())->sendReportAcceptSms($this->userInfo['telephone'], $userReport['user_mobile']);
+        $msgModel = new MsgModel();
+        $msgModel->sendReportAcceptSms($this->userInfo['telephone'], $userReport['user_mobile']);
+        $msgModel->sendUserAcceptSms($userReport['user_mobile'], $this->userInfo['group_id']);
 
         return success(['report_id' => $report_id]);
     }
@@ -562,7 +578,7 @@ class ReportModel extends Crud {
             // 勘验笔录信息
             $fields = 'check_start_time,check_end_time,event_time,weather,car_type,full_name,plate_num,involved_action,involved_build_project,involved_act,involved_action_type,extra_info,signature_checker,signature_writer,signature_agent,signature_invitee';
         }
-
+        
         $reportData += $this->getDb()->field($fields)->table('qianxing_report_info')->where(['id' => $post['report_id']])->limit(1)->find();
 
         if ($post['data_type'] == 'paper') {
@@ -596,12 +612,6 @@ class ReportModel extends Crud {
             $reportData['site_photos'] = json_decode($reportData['site_photos'], true);
             foreach ($reportData['site_photos'] as $k => $v) {
                 $reportData['site_photos'][$k]['src'] = httpurl($v['src']);
-            }
-        }
-        if ($reportData['extra_photos']) {
-            $reportData['extra_photos'] = json_decode($reportData['extra_photos'], true);
-            foreach ($reportData['extra_photos'] as $k => $v) {
-                $reportData['extra_photos'][$k]['src'] = httpurl($v['src']);
             }
         }
         if (isset($reportData['involved_action'])) {
@@ -726,7 +736,7 @@ class ReportModel extends Crud {
 
         if (!$post['report_id']) {
             // 更新统计数
-            (new UserCountModel())->setReportCount('old', null, $this->userInfo['id']);
+            (new UserCountModel())->setReportCount($this->userInfo['id']);
         }
         
         return success(['report_id' => $report_id]);
@@ -739,12 +749,19 @@ class ReportModel extends Crud {
     public function cardInfo (array $post)
     {
         $post['report_id'] = intval($post['report_id']);
-        $post['addr']      = trim_space($post['addr'], 0, 50);
+        $post['addr'] = trim_space($post['addr'], 0, 50);
         $post['full_name'] = trim_space($post['full_name'], 0, 20);
-        $post['car_type']  = CarType::format($post['car_type']);
-        
-        if ($post['plate_num'] && !check_car_license($post['plate_num'])) {
-            return error('车牌号格式不正确');
+        $post['car_type'] = CarType::format($post['car_type']);
+        $post['plate_num'] = get_short_array($post['plate_num'], ',', 220);
+
+        if ($post['plate_num']) {
+            $post['plate_num'] = array_unique(array_filter($post['plate_num']));
+            foreach ($post['plate_num'] as $k => $v) {
+                if (!check_car_license($v)) {
+                    return error('车牌号“' . $v . '”格式不正确');
+                }
+            }
+            $post['plate_num'] = implode(',', $post['plate_num']);
         }
         if ($post['idcard'] && !Idcard::check_id($post['idcard'])) {
             return error('身份证号格式不正确');
@@ -820,7 +837,7 @@ class ReportModel extends Crud {
         }
 
         // 更新统计数
-        (new UserCountModel())->setReportCount('complete', null, $this->userInfo['id']);
+        (new UserCountModel())->setReportCount(null, $this->userInfo['id']);
 
         return success('ok');
     }
