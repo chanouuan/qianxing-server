@@ -154,7 +154,7 @@ class JSSDK {
             // aes 解密
             $errCode = $pc->decryptData($post['getPhoneNumber']['encryptedData'], $post['getPhoneNumber']['iv'], $data);
             if ($errCode !== 0) {
-                return error('getPhoneNumber解密失败！[' . $errCode . ']');
+                return error('微信手机号授权失败，请重试！');
             }
             // {"phoneNumber": "13580006666","purePhoneNumber": "13580006666","countryCode": "86","watermark": {"appid": "APPID","timestamp": TIMESTAMP}}
             $data = json_decode($data, true);
