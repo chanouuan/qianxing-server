@@ -335,6 +335,7 @@ class WordModel extends Crud {
         $result = [];
         $data = json_decode($data, true);
         foreach ($target as $k => $v) {
+            // ☑ ☐ □
             $result[$lit . '.' . $v] = $data[$v] ? '☑' : '☐';
         }
         return $result;

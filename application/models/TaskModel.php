@@ -18,6 +18,7 @@ class TaskModel extends Crud {
         }
         // 每天 1 点执行
         if (false !== strpos($timer, '1h')) {
+            $this->cleanRatelimit();
         }
         // 每天 2 点执行
         if (false !== strpos($timer, '2h')) {
@@ -52,6 +53,18 @@ class TaskModel extends Crud {
             return false;
         }
         return true;
+    }
+
+    /**
+     * 清理限流记录
+     * @return bool
+     */
+    protected function cleanRatelimit ()
+    {
+        return $this->getDb
+                    ->table('pro_ratelimit')
+                    ->where(['time' => ['<', mktime(0, 0, 0, date('m', TIMESTAMP), date('d', TIMESTAMP), date('Y', TIMESTAMP))]])
+                    ->delete();
     }
 
 }
