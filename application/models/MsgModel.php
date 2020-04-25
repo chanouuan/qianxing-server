@@ -18,7 +18,7 @@ class MsgModel extends Crud {
         $adminUsers = $this->getDb()
             ->table('admin_roles role inner join admin_role_user user on user.role_id = role.id')
             ->field('user.user_id')
-            ->where(['role.name' => '外勤', 'role.group_id' => $group_id, 'role.is_sys' => 1])
+            ->where(['role.name' => ['in', ['外勤', '管理员']], 'role.group_id' => $group_id, 'role.is_sys' => 1])
             ->select();
         if (!$adminUsers) {
             return false;
@@ -112,7 +112,7 @@ class MsgModel extends Crud {
             'name' => $groupInfo['way_name'],
             'num' => '[' . date('Y', TIMESTAMP) . ']' . $reportInfo['archive_num']
         ];
-        return (new AliSmsHelper())->sendSms('黔中行', 'SMS_188565950', $userInfo['telephone'], $params);
+        return (new AliSmsHelper())->sendSms('黔中行', 'SMS_189016294', $userInfo['telephone'], $params);
     }
 
     /**

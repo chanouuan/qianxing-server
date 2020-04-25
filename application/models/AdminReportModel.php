@@ -39,10 +39,18 @@ class AdminReportModel extends Crud {
             return error('案件未找到');
         }
 
+        // 获取卷宗号
+        $reportInfo = $this->getDb()->table('qianxing_report_info')->field('archive_num')->where(['id' => $post['report_id']])->find();
+
         if (false === $this->getDb()->table('qianxing_report_info')->where(['id' => $post['report_id']])->update([
             'archive_num' => $post['archive_num']
         ])) {
             return error('数据更新失败');
+        }
+
+        // 更新统计
+        if (!$reportInfo['archive_num']) {
+            (new ReportModel())->reportCompleteCall($post['report_id']);
         }
 
         // 删除卷宗文件
@@ -275,10 +283,6 @@ class AdminReportModel extends Crud {
             'complete_time' => date('Y-m-d H:i:s', TIMESTAMP)
         ])) {
             return error('更新数据失败');
-        }
-
-        if ($post['money'] === $discost) {
-            (new ReportModel())->reportCompleteCall($reportData['id']);
         }
 
         return success('ok');
