@@ -46,7 +46,7 @@ class MsgModel extends Crud {
             'type' => \app\common\ReportType::getMessage($templete_params['report_type'])
         ];
         $params = array_fill(0, count($telephone), $params);
-        return (new AliSmsHelper())->sendBatchSms('黔中行', 'SMS_188556034', $telephone, $params);
+        return (new AliSmsHelper())->sendBatchSms('花千树', 'SMS_188556034', $telephone, $params);
     }
 
     /**
@@ -61,7 +61,7 @@ class MsgModel extends Crud {
             'date' => date('Y年m月d日 H时i分', TIMESTAMP),
             'group' => $groupInfo['name']
         ];
-        return (new AliSmsHelper())->sendSms('黔中行', 'SMS_188990694', $user_phone, $params);
+        return (new AliSmsHelper())->sendSms('花千树', 'SMS_188990694', $user_phone, $params);
     }
 
     /**
@@ -75,7 +75,7 @@ class MsgModel extends Crud {
             'date' => date('Y年m月d日 H时i分', TIMESTAMP),
             'phone' => $param_phone
         ];
-        return (new AliSmsHelper())->sendSms('黔中行', 'SMS_188570794', $user_phone, $params);
+        return (new AliSmsHelper())->sendSms('花千树', 'SMS_188570794', $user_phone, $params);
     }
 
     /**
@@ -94,7 +94,7 @@ class MsgModel extends Crud {
             'group' => $groupInfo['name'],
             'phone' => $groupInfo['phone']
         ];
-        return (new AliSmsHelper())->sendSms('黔中行', 'SMS_188551111', $user_phone, $params);
+        return (new AliSmsHelper())->sendSms('花千树', 'SMS_188551111', $user_phone, $params);
     }
 
     /**
@@ -112,7 +112,7 @@ class MsgModel extends Crud {
             'name' => $groupInfo['way_name'],
             'num' => '[' . date('Y', TIMESTAMP) . ']' . $reportInfo['archive_num']
         ];
-        return (new AliSmsHelper())->sendSms('黔中行', 'SMS_189016294', $userInfo['telephone'], $params);
+        return (new AliSmsHelper())->sendSms('花千树', 'SMS_189016294', $userInfo['telephone'], $params);
     }
 
     /**
@@ -121,7 +121,7 @@ class MsgModel extends Crud {
      */
     public function sendCode ($phone, $code)
     {
-        return (new AliSmsHelper())->sendSms('黔中行', 'SMS_133971610', $phone, ['code' => $code]);
+        return (new AliSmsHelper())->sendSms('花千树', 'SMS_133971610', $phone, ['code' => $code]);
     }
 
 }
