@@ -264,10 +264,16 @@ class ReportModel extends Crud {
             }
         }
 
-        if (!$this->getDb()->transaction(function ($db) use ($post, $items) {
+        $total_money = array_sum(array_column($items, 'total_money'));
+
+        if ($total_money > 15000000) {
+            return error('总金额最高不超过15万元');
+        }
+
+        if (!$this->getDb()->transaction(function ($db) use ($post, $items, $total_money) {
             // 更新赔付金额
             if (!$this->getDb()->where(['id' => $post['report_id'], 'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]]])->update([
-                'total_money' => array_sum(array_column($items, 'total_money')),
+                'total_money' => $total_money,
                 'update_time' => date('Y-m-d H:i:s', TIMESTAMP)
             ])) {
                 return false;
@@ -292,7 +298,7 @@ class ReportModel extends Crud {
             }
             return true;
         })) {
-            return error('保持数据失败');
+            return error('保存数据失败');
         }
 
         return success('ok');

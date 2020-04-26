@@ -140,7 +140,7 @@ class UserReportModel extends Crud {
         }
 
         // 执法单位区域
-        if (!$groupInfo = (new GroupModel())->find(['id' => $post['group_id'], 'district' => $post['district']], 'id,name,phone')) {
+        if (!$groupInfo = (new GroupModel())->find(['id' => $post['group_id']], 'id,name,phone')) {
             return error('未找到该单位');
         }
 
