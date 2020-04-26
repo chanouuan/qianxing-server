@@ -141,6 +141,7 @@ class WordModel extends Crud {
         $groupInfo = $groupModel->find(['id' => $groupInfo['parent_id']], 'name');
         $reportData['group_root_name'] = $groupInfo['name'];
 
+        // 报送信息
         $reportData += $this->getDb()->table('qianxing_report_info')->where(['id' => $reportData['id']])->limit(1)->find();
 
         $reportData['gender'] = Gender::getMessage($reportData['gender']);      
@@ -164,11 +165,13 @@ class WordModel extends Crud {
         $reportData += $this->getSplitDate('event_time', $reportData['event_time']);
         $reportData += $this->getSplitDate('check_start_time', $reportData['check_start_time']);
         $reportData += $this->getSplitDate('check_end_time', $reportData['check_end_time']);
+        $reportData += $this->getSplitDate('checker_time', $reportData['checker_time']);
+        $reportData += $this->getSplitDate('agent_time', $reportData['agent_time']);
         $reportData += $this->getSplitDate('current_date', date('Y-m-d H:i:s', TIMESTAMP));
         $reportData += $this->getSplitCheckBox('involved_action', $reportData['involved_action'], ['a', 'b', 'c', 'c1', 'c2', 'c3', 'c4', 'd', 'e']);
         $reportData += $this->getSplitCheckBox('involved_action_type', $reportData['involved_action_type'], ['a', 'b', 'c']);
         $reportData += $this->getSplitCheckBoxIf($reportData);
-        unset($reportData['event_time'], $reportData['check_start_time'], $reportData['check_end_time'], $reportData['involved_action'], $reportData['involved_action_type']);
+        unset($reportData['event_time'], $reportData['check_start_time'], $reportData['check_end_time'], $reportData['checker_time'], $reportData['agent_time'], $reportData['involved_action'], $reportData['involved_action_type']);
 
         $reportData['weather'] = Weather::getMessage($reportData['weather']);
         $reportData['car_type'] = CarType::getMessage($reportData['car_type']);
@@ -345,11 +348,11 @@ class WordModel extends Crud {
     {
         $date = strtotime($date);
         return [
-            $lit . '.year' => date('Y', $date),
-            $lit . '.month' => date('n', $date),
-            $lit . '.day' => date('j', $date),
-            $lit . '.hour' => date('G', $date),
-            $lit . '.minute' => intval(date('i', $date))
+            $lit . '.year' => $date ? date('Y', $date) : '',
+            $lit . '.month' => $date ? date('n', $date) : '',
+            $lit . '.day' => $date ? date('j', $date) : '',
+            $lit . '.hour' => $date ? date('G', $date) : '',
+            $lit . '.minute' => $date ? intval(date('i', $date)) : ''
         ];
     }
 

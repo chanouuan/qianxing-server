@@ -400,6 +400,15 @@ class ReportModel extends Crud {
         $update['car_type']  = $post['car_type'];
         $update = array_filter($update);
 
+        // 勘验人签字时间
+        if ($post['report_field'] === 'signature_checker') {
+            $update['checker_time'] = date('Y-m-d H:i:s', TIMESTAMP);
+        }
+        // 当事人签字时间
+        if ($post['report_field'] === 'signature_agent') {
+            $update['agent_time'] = date('Y-m-d H:i:s', TIMESTAMP);
+        }
+
         if (false === $this->getDb()->table('qianxing_report_info')->where(['id' => $post['report_id']])->update($update)) {
             return error('图片保存失败');
         }
@@ -447,11 +456,23 @@ class ReportModel extends Crud {
             return success($result);
         }
 
-        if (!$result['list'] = $this->getDb()->field('id,group_id,location,address,user_mobile,stake_number,total_money,status,create_time')->where($condition)->order('id desc')->limit($result['limit'])->select()) {
+        if (!$result['list'] = $this->getDb()->field('id,group_id,location,address,user_mobile,stake_number,total_money,status,complete_time,create_time')->where($condition)->order('id desc')->limit($result['limit'])->select()) {
             return success($result);
         }
 
-        if (!$post['islaw']) {
+        if ($post['islaw']) {
+            // 管理端
+            if ($post['status'] == 2) {
+                // 已完成
+                $infos = $this->getDb()->table('qianxing_report_info')->field('id,full_name,plate_num')->where(['id' => ['in', array_column($result['list'], 'id')]])->select();
+                $infos = array_column($infos, null, 'id');
+                foreach ($result['list'] as $k => $v) {
+                    $result['list'][$k]['full_name'] = $infos[$v['id']]['full_name'];
+                    $result['list'][$k]['plate_num'] = $infos[$v['id']]['plate_num'];
+                }
+                unset($infos);
+            }
+        } else {
             // 用户端
             $infos = $this->getDb()->table('qianxing_report_info')->field('id,event_time,full_name,plate_num')->where(['id' => ['in', array_column($result['list'], 'id')]])->select();
             $infos = array_column($infos, null, 'id');
@@ -582,7 +603,7 @@ class ReportModel extends Crud {
             $fields = 'addr,full_name,idcard,gender,birthday,plate_num,car_type';
         } else if ($post['data_type'] == 'paper') {
             // 勘验笔录信息
-            $fields = 'check_start_time,check_end_time,event_time,weather,car_type,full_name,plate_num,involved_action,involved_build_project,involved_act,involved_action_type,extra_info,signature_checker,signature_writer,signature_agent,signature_invitee';
+            $fields = 'check_start_time,check_end_time,event_time,weather,car_type,full_name,plate_num,involved_action,involved_build_project,involved_act,involved_action_type,extra_info,signature_checker,signature_writer,signature_agent,signature_invitee,checker_time,agent_time';
         }
         
         $reportData += $this->getDb()->field($fields)->table('qianxing_report_info')->where(['id' => $post['report_id']])->limit(1)->find();
@@ -594,6 +615,8 @@ class ReportModel extends Crud {
             $lawNums = (new AdminModel())->getLawNumByUser([$reportData['law_id'], $reportData['colleague_id']]);
             $reportData['law_lawnum'] = strval($lawNums[$reportData['law_id']]);
             $reportData['colleague_lawnum'] = strval($lawNums[$reportData['colleague_id']]);
+            // 获取卷宗号
+            $reportData['way_name'] = (new GroupModel())->count(['id' => $reportData['group_id']], 'way_name');
         }
 
         if (isset($reportData['idcard_front'])) {
