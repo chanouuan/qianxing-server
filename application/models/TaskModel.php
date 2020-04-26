@@ -61,7 +61,7 @@ class TaskModel extends Crud {
      */
     protected function cleanRatelimit ()
     {
-        return $this->getDb
+        return $this->getDb()
                     ->table('pro_ratelimit')
                     ->where(['time' => ['<', mktime(0, 0, 0, date('m', TIMESTAMP), date('d', TIMESTAMP), date('Y', TIMESTAMP))]])
                     ->delete();
