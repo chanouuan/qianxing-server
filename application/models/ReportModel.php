@@ -762,6 +762,8 @@ class ReportModel extends Crud {
                 }
             }
             $post['plate_num'] = implode(',', $post['plate_num']);
+        } else {
+            $post['plate_num'] = '';
         }
         if ($post['idcard'] && !Idcard::check_id($post['idcard'])) {
             return error('身份证号格式不正确');

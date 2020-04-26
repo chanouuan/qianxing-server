@@ -237,7 +237,7 @@ class UserModel extends Crud {
      */
     public function getColleague (int $user_id, int $group_id)
     {
-        return $this->select(['group_id' => $group_id, 'id' => ['<>', $user_id], 'status' => 1], 'id,full_name as name');
+        return $this->select(['group_id' => $group_id, 'id' => ['not in', [1, $user_id]], 'status' => 1], 'id,full_name as name');
     }
 
     /**
