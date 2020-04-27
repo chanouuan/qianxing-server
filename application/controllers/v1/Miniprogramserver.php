@@ -43,7 +43,13 @@ class Miniprogramserver extends ActionPDO {
 
     public function _init()
     {
-
+        if ($this->_G['user']) {
+            // 登录时长
+            $loginTime = strtotime($this->_G['user']['update_time']);
+            if ($loginTime < TIMESTAMP - 86400) {
+                json(null, \StatusCodes::getMessage(\StatusCodes::USER_NOT_LOGIN_ERROR), \StatusCodes::USER_NOT_LOGIN_ERROR, \StatusCodes::STATUS_OK);
+            }
+        }
     }
 
     /**

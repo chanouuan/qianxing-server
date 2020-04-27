@@ -257,11 +257,8 @@ abstract class ActionPDO {
             return false;
         }
         $this->_G['token'] = explode("\t", authcode(rawurldecode($token), 'DECODE'));
-        list ($user_id, $scode, $client, $addr) = $this->_G['token'];
+        list ($user_id, $scode, $client, $data) = $this->_G['token'];
         if (!$user_id || !$scode) {
-            return false;
-        }
-        if (!empty($addr) && 0 !== strpos($_SERVER['REMOTE_ADDR'], substr($addr, 0, strrpos($addr, '.')))) {
             return false;
         }
         $clienttype = $clienttype ? $clienttype : ($client ? $client : (defined('CLIENT_TYPE') ? CLIENT_TYPE : ''));
