@@ -60,8 +60,12 @@ class WordModel extends Crud {
      */
     public function createNote ($file_name, array $condition, $output_format = 'docx', $replace = false)
     {
-        $templateSource = APPLICATION_PATH . '/public/static/word_template/' . $file_name . '.docx';
-        $templateSaveAs = $this->getSavePath($condition['id'], $file_name);
+        if (!$reportData = $this->getDb()->table('qianxing_report')->field('id,group_id')->where($condition)->limit(1)->find()) {
+            return error('案件未找到');
+        }
+
+        // 保存路径
+        $templateSaveAs = $this->getSavePath($reportData['id'], $file_name);
         
         if (!$replace && file_exists(APPLICATION_PATH . '/public/' . $templateSaveAs)) {
             $url = httpurl($templateSaveAs);
@@ -73,6 +77,12 @@ class WordModel extends Crud {
             return success([
                 'url' => $url
             ]);
+        }
+
+        // 模板路径
+        $templateSource = APPLICATION_PATH . '/public/static/word_template/' . $file_name . $reportData['group_id'] . '.docx';
+        if (!file_exists($templateSource)) {
+            $templateSource = APPLICATION_PATH . '/public/static/word_template/' . $file_name . '.docx';
         }
 
         $templateProcessor = new \PhpOffice\PhpWord\TemplateProcessor($templateSource);

@@ -170,7 +170,9 @@ class AdminModel extends Crud {
         if (!$userInfo = (new UserModel())->select(['id' => ['in', $user_id]], 'id,telephone')) {
             return [];
         }
-        $userInfo = array_column($userInfo, 'telephone', 'id');
+        if (!$userInfo = array_filter(array_column($userInfo, 'telephone', 'id'))) {
+            return [];
+        }
         if (!$adminInfo = $this->select(['telephone' => ['in', $userInfo]], 'telephone,law_num')) {
             return [];
         }

@@ -191,6 +191,20 @@ class UserModel extends Crud {
     }
 
     /**
+     * 获取用户其他信息
+     * @return array
+     */
+    public function getUserProfile ($user_id)
+    {
+        $data = [];
+        $lawNums = (new AdminModel())->getLawNumByUser([$user_id]);
+        if ($lawNums) {
+            $data['law_num'] = $lawNums[$user_id]; // 执法证号
+        }
+        return success($data);
+    }
+
+    /**
      * 获取用户信息
      * @return array
      */

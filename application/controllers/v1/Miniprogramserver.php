@@ -176,6 +176,21 @@ class Miniprogramserver extends ActionPDO {
     {
         return success((new \app\models\UserCountModel())->loadInfo($this->_G['user']['user_id']));
     }
+
+    /**
+     * 获取用户其他信息
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":[]
+     * }
+     */
+    public function getUserProfile ()
+    {
+        return (new \app\models\UserModel())->getUserProfile($this->_G['user']['user_id']);
+    }
     
     /**
      * 更改用户信息
