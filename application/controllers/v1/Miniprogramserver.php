@@ -524,5 +524,19 @@ class Miniprogramserver extends ActionPDO {
         return (new \app\models\ReportModel($this->_G['user']['user_id']))->trunReport($_POST);
     }
     
+    /**
+     * 恢复畅通
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":{}
+     * }
+     */
+    public function recoverPass ()
+    {
+        return (new \app\models\ReportModel($this->_G['user']['user_id']))->recoverPass($_POST);
+    }
 
 }

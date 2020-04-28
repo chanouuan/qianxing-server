@@ -134,7 +134,8 @@ class WordModel extends Crud {
         $groupModel = new GroupModel();
         $adminModel = new AdminModel();
         $userModel = new UserModel();
-
+        
+        $reportData['stake_number'] = str_replace(' ', '', $reportData['stake_number']);
         $reportData['total_money'] = round_dollar($reportData['total_money']);
         $reportData['dollar'] = conver_chinese_dollar($reportData['total_money']);
         $reportData += $this->getSplitDate('handle_time', $reportData['handle_time']);

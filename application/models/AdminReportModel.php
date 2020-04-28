@@ -147,7 +147,7 @@ class AdminReportModel extends Crud {
                 $list[$k]['total_money'] = round_dollar($v['total_money']);
                 $list[$k]['law_name'] = $userNames[$v['law_id']];
                 $list[$k]['status_str'] = ReportStatus::getMessage($v['status']);
-                $list[$k]['address'] = $v['stake_number'] ? $v['stake_number'] : $v['address'];
+                $list[$k]['address'] = $v['stake_number'] ? str_replace(' ', '', $v['stake_number']) : $v['address'];
                 $list[$k]['create_time'] = substr($v['create_time'], 0, 16);
             }
             unset($userNames);
@@ -197,6 +197,7 @@ class AdminReportModel extends Crud {
         $reportData['cash'] = round_dollar($reportData['cash']);
         $reportData['total_money'] = round_dollar($reportData['total_money']);
         $reportData['status_str'] = ReportStatus::getMessage($reportData['status']);
+        $reportData['stake_number'] = str_replace(' ', '', $reportData['stake_number']);
 
         $adminModel = new AdminModel();
         $userModel = new UserModel();
