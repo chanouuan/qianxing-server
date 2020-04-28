@@ -16,11 +16,7 @@ class BannerModel extends Crud {
     {
         $result = [
             [
-                'img' => httpurl('/static/img/pic1.jpg'),
-                'title' => ''
-            ],
-            [
-                'img' => httpurl('/static/img/pic2.jpg'),
+                'img' => httpurl('/static/img/pic11.jpg'),
                 'title' => ''
             ]
         ];
