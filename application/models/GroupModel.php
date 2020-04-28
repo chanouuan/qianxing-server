@@ -42,7 +42,7 @@ class GroupModel extends Crud {
             // 只看本部门的
             $userModel = new UserModel();
             $userInfo = $userModel->checkUserInfo($user_id);
-            $result[0] = $userModel->select(['group_id' => $userInfo['group_id'], 'status' => 1], 'id,full_name as name');
+            $result[0] = $userModel->select(['id' => ['>1'], 'group_id' => $userInfo['group_id'], 'status' => 1], 'id,full_name as name');
             return success($result);
         }
         
