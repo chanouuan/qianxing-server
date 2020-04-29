@@ -169,10 +169,9 @@ class ImportModel extends Crud {
      */
     private function upFilterData($data)
     {
-        $data = trim_space($data);
+        $data = trim_space($data, 0, 200);
         $data = str_replace(["\r", "\n", "\t", '"', '\''], '', $data);
-        $data = mb_substr($data, 0, 200, 'UTF-8');
-        $data = htmlspecialchars(rtrim($data, "\0"), ENT_QUOTES);
+        $data = htmlspecialchars($data, ENT_QUOTES);
         return $data;
     }
 

@@ -605,7 +605,7 @@ class DebugLog {
         }
 
         if ($rs) {
-            self::$mysql[] = mb_substr(is_array($rs) ? json_unicode_encode($rs) : $rs, 0, 200, 'UTF-8﻿');
+            self::$mysql[] = mb_substr(is_array($rs) ? json_unicode_encode($rs) : $rs, 0, 200);
         }
     }
 
@@ -661,7 +661,7 @@ class DebugLog {
             $arr[] = $args;
         }
         if ($rs) {
-            $arr[] = mb_substr(is_array($rs) ? json_unicode_encode($rs) : $rs, 0, 200, 'UTF-8﻿');
+            $arr[] = mb_substr(is_array($rs) ? json_unicode_encode($rs) : $rs, 0, 200);
         }
         self::$curl[] = implode(' ', $arr);
     }
