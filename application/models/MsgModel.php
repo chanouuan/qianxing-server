@@ -45,8 +45,7 @@ class MsgModel extends Crud {
             'address' => $templete_params['address'],
             'type' => \app\common\ReportType::getMessage($templete_params['report_type'])
         ];
-        $params = array_fill(0, count($telephone), $params);
-        return (new AliSmsHelper())->sendBatchSms('花千树', 'SMS_188556034', $telephone, $params);
+        return (new AliSmsHelper())->sendSms('花千树', 'SMS_188556034', $telephone, $params);
     }
 
     /**

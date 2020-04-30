@@ -30,7 +30,8 @@ class AliSmsHelper {
     public function sendBatchSms($signName, $templateCode, $telephone_arr, $templateParam_arr)
     {
         $params = array ();
-        
+        $telephone_arr = array_values($telephone_arr);
+
         // fixme 必填: 待发送手机号。支持JSON格式的批量调用，批量上限为100个手机号码,批量调用相对于单条调用及时性稍有延迟,验证码类型的短信推荐使用单条调用的方式
         $params["PhoneNumberJson"] = $telephone_arr;
         // fixme 必填: 短信签名，支持不同的号码发送不同的短信签名，每个签名都应严格按"签名名称"填写，请参考: https://dysms.console.aliyun.com/dysms.htm#/develop/sign
@@ -79,8 +80,10 @@ class AliSmsHelper {
     public function sendSms ($signName, $templateCode, $telephone, $templateParam)
     {
         $params = array();
+        $telephone = is_array($telephone) ? implode(',', $telephone) : $telephone;
         
         // fixme 必填: 短信接收号码
+        // 支持对多个手机号码发送短信，手机号码之间以英文逗号（,）分隔。上限为1000个手机号码。批量调用相对于单条调用及时性稍有延迟。
         $params["PhoneNumbers"] = $telephone;
         // fixme 必填: 短信签名，应严格按"签名名称"填写，请参考: https://dysms.console.aliyun.com/dysms.htm#/develop/sign
         $params["SignName"] = $signName;
