@@ -805,6 +805,7 @@ class ReportModel extends Crud {
         $post['check_start_time'] = strtotime($post['check_start_time']);
         $post['check_start_time'] = $post['check_start_time'] ? $post['check_start_time'] : TIMESTAMP;
         $post['is_property'] = $post['is_property'] ? 1 : 0;
+        $post['is_property'] = 1;
 
         if (!$post['location'] || !$post['address']) {
             return error('请定位位置');
