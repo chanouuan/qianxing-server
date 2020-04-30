@@ -135,7 +135,7 @@ class AdminReportModel extends Crud {
             }
             $list = $this->getDb()
                          ->table('qianxing_report report left join qianxing_report_info info on info.id = report.id')
-                         ->field('report.id,law_id,user_mobile,address,stake_number,pay,cash,total_money,create_time,status,full_name,plate_num,archive_num')
+                         ->field('report.id,law_id,user_mobile,address,stake_number,pay,cash,total_money,create_time,recover_time,status,full_name,plate_num,archive_num')
                          ->where($condition)
                          ->order('report.id desc')
                          ->limit($pagesize['limitstr'])
@@ -146,7 +146,7 @@ class AdminReportModel extends Crud {
                 $list[$k]['cash'] = round_dollar($v['cash']);
                 $list[$k]['total_money'] = round_dollar($v['total_money']);
                 $list[$k]['law_name'] = $userNames[$v['law_id']];
-                $list[$k]['status_str'] = ReportStatus::getMessage($v['status']);
+                $list[$k]['status_str'] = ReportStatus::remark($v['status'], $v['recover_time']);
                 $list[$k]['address'] = $v['stake_number'] ? str_replace(' ', '', $v['stake_number']) : $v['address'];
                 $list[$k]['create_time'] = substr($v['create_time'], 0, 16);
             }

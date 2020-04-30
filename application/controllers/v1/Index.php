@@ -102,6 +102,11 @@ class Index extends ActionPDO {
 
     public function index () 
     {
+        // (new \app\models\MsgModel())->sendReportEventSms(3, [
+        //     'user_mobile' => '13333333333',
+        //     'address' => '测试',
+        //     'report_type' => 1
+        // ]);
         die();
     }
 

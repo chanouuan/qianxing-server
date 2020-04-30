@@ -25,6 +25,7 @@ class Miniprogramserver extends ActionPDO {
             'acceptReport'        => ['interval' => 1000],
             'getReportDetail'     => ['interval' => 200],
             'reportInfo'          => ['interval' => 1000],
+            'saveReportInfo'      => ['interval' => 1000],
             'cardInfo'            => ['interval' => 1000],
             'searchPropertyItems' => ['interval' => 200],
             'reportItem'          => ['interval' => 1000],
@@ -64,12 +65,23 @@ class Miniprogramserver extends ActionPDO {
      */
     public function loadData ()
     {
-        $banner = (new \app\models\BannerModel())->getBanner();
-        $usercount = (new \app\models\UserCountModel())->loadInfo($this->_G['user']['user_id'], 'report_count');
-        return success([
-            'banner' => $banner,
-            'report_count' => $usercount['report_count']
-        ]);
+        $result = [];
+
+        if (!$_POST['page'] || $_POST['page'] == 'index') {
+            // banner
+            $result['banner'] = (new \app\models\BannerModel())->getBanner();
+        }
+        
+        if (!$_POST['page'] || ($_POST['page'] == 'index' && $_POST['view'] == 'law')) {
+            // 事故处理数
+            $userCount = (new \app\models\UserCountModel())->loadInfo($this->_G['user']['user_id'], 'report_count');
+            $result['report_count'] = $userCount['report_count'];
+            $reportCount = (new \app\models\UserReportModel())->count(['group_id' => intval($_POST['group_id']), 'status' => \app\common\ReportStatus::WAITING]);
+            $result['report_count'] += intval($reportCount);
+            $result['report_count'] = $result['report_count'] > 99 ? '99+' : $result['report_count'];
+        }
+
+        return success($result);
     }
 
     /**
@@ -275,7 +287,6 @@ class Miniprogramserver extends ActionPDO {
      */
     public function getUserReportEvents () 
     {
-        $_POST['status'] = 0; // 只获取未受理
         return (new \app\models\UserReportModel())->getUserReportEvents($this->_G['user']['user_id'], $_POST);
     }
 
@@ -342,6 +353,21 @@ class Miniprogramserver extends ActionPDO {
     public function reportInfo ()
     {
         return (new \app\models\ReportModel($this->_G['user']['user_id']))->reportInfo($_POST);
+    }
+
+    /**
+     * 保存案件信息
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":[]
+     * }
+     */
+    public function saveReportInfo ()
+    {
+        return (new \app\models\ReportModel($this->_G['user']['user_id']))->saveReportInfo($_POST);
     }
 
     /**

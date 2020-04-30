@@ -40,8 +40,34 @@ class ReportModel extends Crud {
         $post['report_id'] = intval($post['report_id']);
         $post['recover_time'] = $post['recover_time'] && strtotime($post['recover_time']) ? $post['recover_time'] : date('Y-m-d H:i:00', TIMESTAMP);
         
-        if (false === $this->getDb()->where(['id' => $post['report_id'], 'law_id' => $this->userInfo['id']])->update(['recover_time' => $post['recover_time']])) {
-            return error('数据保存失败');
+        $condition = [
+            'id' => $post['report_id'], 
+            'law_id' => $this->userInfo['id'], 
+            'recover_time' => null
+        ];
+        if (!$reportData = $this->find($condition, 'is_property')) {
+            return error('未找到案件');
+        }
+
+        $data = [
+            'recover_time' => $post['recover_time']
+        ];
+
+        if ($reportData['is_property'] == 0) {
+            // 未路产受损
+            $condition['total_money'] = 0;
+            $condition['status'] = ReportStatus::ACCEPT;
+            $data['status'] = ReportStatus::COMPLETE;
+            $data['complete_time'] = date('Y-m-d H:i:s', TIMESTAMP);
+        }
+
+        if (false === $this->getDb()->where($condition)->update($data)) {
+            return error('无效案件');
+        }
+
+        if ($reportData['is_property'] == 0) {
+            // 未路产受损,恢复畅通后直接结案
+            $this->reportCompleteCall($post['report_id']);
         }
 
         return success('ok');
@@ -138,7 +164,7 @@ class ReportModel extends Crud {
      */
     public function reportCompleteCall ($report_id)
     {
-        if (!$reportData = $this->find(['id' => $report_id, 'status' => ReportStatus::COMPLETE], 'id,group_id,law_id,user_mobile,colleague_id,location,user_id')) {
+        if (!$reportData = $this->find(['id' => $report_id, 'status' => ReportStatus::COMPLETE], 'id,group_id,law_id,user_mobile,colleague_id,location,user_id,is_property')) {
             return false;
         }
 
@@ -152,8 +178,11 @@ class ReportModel extends Crud {
         $userCountModel->setReportCount(null, $reportData['law_id']);
 
         // 推送通知给路政
-        (new MsgModel())->sendReportCompleteSms($reportData['law_id'], $reportData['id']);
-
+        if ($reportData['is_property']) {
+            // 有路产受损
+            (new MsgModel())->sendReportCompleteSms($reportData['law_id'], $reportData['id']);
+        }
+        
         return true;
     }
 
@@ -470,14 +499,20 @@ class ReportModel extends Crud {
     public function getReportEvents (int $user_id, array $post) 
     {
         $post['islaw'] = $post['islaw'] ? 1 : 0;
+        $post['group_id'] = intval($post['group_id']);
         $post['status'] = intval($post['status']);
         $post['lastpage'] = intval($post['lastpage']);
 
         $result = [
             'limit' => 5,
             'lastpage' => '',
-            'list' => []
+            'list' => [],
+            'count' => []
         ];
+
+        if (!$post['lastpage']) {
+            $result['count'] = (new UserReportModel())->getEventsCount($post['group_id'], $post['islaw'] ? $user_id : null, $post['islaw'] ? null : $user_id);
+        }
 
         // 搜索案件状态
         $status = [
@@ -503,7 +538,7 @@ class ReportModel extends Crud {
             return success($result);
         }
 
-        if (!$result['list'] = $this->getDb()->field('id,group_id,location,address,user_mobile,stake_number,total_money,status,is_load,complete_time,recover_time,create_time')->where($condition)->order('id desc')->limit($result['limit'])->select()) {
+        if (!$result['list'] = $this->getDb()->field('id,group_id,location,address,user_mobile,stake_number,total_money,status,is_load,is_property,complete_time,recover_time,create_time')->where($condition)->order('id desc')->limit($result['limit'])->select()) {
             return success($result);
         }
 
@@ -538,7 +573,7 @@ class ReportModel extends Crud {
             $result['lastpage'] = $v['id'];
             $result['list'][$k]['stake_number'] = str_replace(' ', '', $v['stake_number']);
             $result['list'][$k]['total_money'] = round_dollar($v['total_money']);
-            $result['list'][$k]['status_str'] = ReportStatus::getMessage($v['status']);
+            $result['list'][$k]['status_str'] = ReportStatus::remark($v['status'], $v['recover_time']);
         }
 
         return success($result);
@@ -608,7 +643,9 @@ class ReportModel extends Crud {
     {
         $post['report_id'] = intval($post['report_id']);
 
-        $reportData = [];
+        $reportData = [
+            'is_property' => 1 // 默认有路产损失
+        ];
         if ($post['data_type'] == 'info') {
             $reportData['car_type_list'] = \app\common\CarType::getKey();
             $reportData['weather_list'] = \app\common\Weather::getKey();
@@ -628,10 +665,10 @@ class ReportModel extends Crud {
             return success($reportData);
         }
 
-        if (!$data = $this->find(['id' => $post['report_id']], 'id,group_id,location,address,user_id,user_mobile,law_id,colleague_id,stake_number,total_money,status,create_time')) {
+        if (!$data = $this->find(['id' => $post['report_id']], 'id,group_id,location,address,user_id,user_mobile,law_id,colleague_id,stake_number,total_money,is_property,is_load,status,create_time')) {
             return error('案件未找到');
         }
-        $reportData += $data;
+        $reportData = array_merge($reportData, $data);
         unset($data);
 
         $reportData['total_money'] = round_dollar($reportData['total_money']);
@@ -654,7 +691,7 @@ class ReportModel extends Crud {
             $fields = 'addr,full_name,idcard,gender,birthday,plate_num,car_type';
         } else if ($post['data_type'] == 'paper') {
             // 勘验笔录信息
-            $fields = 'check_start_time,check_end_time,event_time,weather,car_type,full_name,plate_num,involved_action,involved_build_project,involved_act,involved_action_type,extra_info,signature_checker,signature_writer,signature_agent,signature_invitee,checker_time,agent_time';
+            $fields = 'check_start_time,check_end_time,event_time,weather,car_type,full_name,plate_num,involved_action,involved_build_project,involved_act,involved_action_type,extra_info,signature_checker,signature_writer,signature_agent,signature_invitee,invitee_mobile,checker_time,agent_time';
         }
         
         $reportData += $this->getDb()->field($fields)->table('qianxing_report_info')->where(['id' => $post['report_id']])->limit(1)->find();
@@ -718,6 +755,35 @@ class ReportModel extends Crud {
     }
 
     /**
+     * 保存案件信息
+     * @return array
+     */
+    public function saveReportInfo (array $post)
+    {
+        $post['report_id'] = intval($post['report_id']);
+
+        $data = [];
+        $data['invitee_mobile'] = $post['invitee_mobile'];
+
+        if ($data['invitee_mobile'] && !validate_telephone($data['invitee_mobile'])) {
+            return error('被邀请人手机号格式错误');
+        }
+
+        $data = array_filter($data);
+
+        if ($data) {
+            if (!$this->count(['id' => $post['report_id'], 'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]], 'law_id' => $this->userInfo['id']])) {
+                return error('案件未找到');
+            }
+            if (false === $this->getDb()->table('qianxing_report_info')->where(['id' => $post['report_id']])->update($data)) {
+                return error('保存数据失败');
+            }
+        }
+
+        return success('ok');
+    }
+
+    /**
      * 填写报送信息
      * @return array
      */
@@ -729,15 +795,16 @@ class ReportModel extends Crud {
         $post['colleague_id'] = intval($post['colleague_id']); 
         $post['stake_number'] = trim($post['stake_number']);
         $post['event_time'] = strtotime($post['event_time']) ? $post['event_time'] : null;
-        $post['weather'] = Weather::format($post['weather']);
-        $post['car_type'] = CarType::format($post['car_type']);
-        $post['event_type'] = EventType::format($post['event_type']);
-        $post['driver_state'] = DriverState::format($post['driver_state']);
-        $post['car_state'] = CarState::format($post['car_state']);
-        $post['traffic_state'] = TrafficState::format($post['traffic_state']);
+        $post['weather'] = intval(Weather::format($post['weather']));
+        $post['car_type'] = intval(CarType::format($post['car_type']));
+        $post['event_type'] = intval(EventType::format($post['event_type']));
+        $post['driver_state'] = intval(DriverState::format($post['driver_state']));
+        $post['car_state'] = intval(CarState::format($post['car_state']));
+        $post['traffic_state'] = intval(TrafficState::format($post['traffic_state']));
         $post['pass_time'] = intval($post['pass_time']);
         $post['check_start_time'] = strtotime($post['check_start_time']);
         $post['check_start_time'] = $post['check_start_time'] ? $post['check_start_time'] : TIMESTAMP;
+        $post['is_property'] = $post['is_property'] ? 1 : 0;
 
         if (!$post['location'] || !$post['address']) {
             return error('请定位位置');
@@ -760,6 +827,8 @@ class ReportModel extends Crud {
                     'address' => $post['address'],
                     'stake_number' => $post['stake_number'],
                     'colleague_id' => $post['colleague_id'],
+                    'is_property' => $post['is_property'],
+                    'is_load' => $post['is_property'] ? ['is_load'] : 1,
                     'update_time' => date('Y-m-d H:i:s', TIMESTAMP)
                 ])) {
                     return false;
@@ -787,6 +856,8 @@ class ReportModel extends Crud {
                     'address' => $post['address'],
                     'stake_number' => $post['stake_number'],
                     'colleague_id' => $post['colleague_id'],
+                    'is_property' => $post['is_property'],
+                    'is_load' => $post['is_property'] ? 0 : 1,
                     'law_id' => $this->userInfo['id'],
                     'status' => ReportStatus::ACCEPT,
                     'report_time' => date('Y-m-d H:i:s', TIMESTAMP),
@@ -818,6 +889,12 @@ class ReportModel extends Crud {
         if (!$post['report_id']) {
             // 更新统计数
             (new UserCountModel())->setReportCount($this->userInfo['id']);
+        }
+
+        // 无路产损失
+        if (!$post['is_property']) {
+            // 不进行勘验，确认恢复畅通后，直接结案
+            return success('ok');
         }
         
         return success(['report_id' => $report_id]);

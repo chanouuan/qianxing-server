@@ -42,7 +42,6 @@ class TaskModel extends Crud {
     public function clearUserReport ()
     {
         $condition = [
-            'status' => \app\common\ReportStatus::WAITING,
             'create_time' => ['<', date('Y-m-d H:i:s', TIMESTAMP - 86400)]
         ];
         // 删除24小时后未受理的报案
@@ -62,9 +61,9 @@ class TaskModel extends Crud {
     protected function cleanRatelimit ()
     {
         return $this->getDb()
-                    ->table('pro_ratelimit')
-                    ->where(['time' => ['<', mktime(0, 0, 0, date('m', TIMESTAMP), date('d', TIMESTAMP), date('Y', TIMESTAMP))]])
-                    ->delete();
+            ->table('pro_ratelimit')
+            ->where(['time' => ['<', mktime(0, 0, 0, date('m', TIMESTAMP), date('d', TIMESTAMP), date('Y', TIMESTAMP))]])
+            ->delete();
     }
 
 }

@@ -73,30 +73,66 @@ class UserReportModel extends Crud {
     }
 
     /**
+     * 获取案件列表统计数
+     * @return array
+     */
+    public function getEventsCount ($group_id, $law_id, $user_id) 
+    {
+        $result = [];
+        if ($law_id) {
+            // 待受理
+            $result[0] = $this->count(['group_id' => $group_id, 'status' => ReportStatus::WAITING]);
+            $list = $this->getDb()->table('qianxing_report')->field('status,count(*) as count')->where(['law_id' => $law_id])->group('status')->select();
+            $list = array_column($list, 'count', 'status');
+            // 受理中
+            $result[1] = intval($list[1]);
+            // 已完成
+            $result[2] = intval($list[2]) + intval($list[3]);
+        }
+        if ($user_id) {
+            // 全部案件
+            $list = $this->getDb()->table('qianxing_report')->field('status,count(*) as count')->where(['user_id' => $user_id])->group('status')->select();
+            $list = array_column($list, 'count', 'status');
+            $result[0] = intval($list[2]) + intval($list[3]);
+            // 已完成
+            $result[1] = intval($list[3]);
+        }
+        unset($list);
+
+        foreach ($result as $k => $v) {
+            if ($v > 99) {
+                $result[$k] = '99+';
+            }
+        }
+        return $result;
+    }
+
+    /**
      * 获取用户报案记录
      * @return array
      */
     public function getUserReportEvents (int $user_id, array $post) 
     {
-        $userInfo = (new UserModel())->checkUserInfo($user_id);
-
-        $post['status']   = ReportStatus::format($post['status']);
+        $post['group_id'] = intval($post['group_id']);
         $post['lastpage'] = intval($post['lastpage']);
 
         $result = [
-            'limit'    => 5,
+            'limit' => 5,
             'lastpage' => '',
-            'list'     => []
+            'list' => [],
+            'count' => []
         ];
 
+        if (!$post['lastpage']) {
+            $result['count'] = $this->getEventsCount($post['group_id'], $user_id, null);
+        }
+
         $condition = [
-            'group_id' => $userInfo['group_id'] // 只获取本单位
+            'group_id' => $post['group_id'], // 只获取本单位
+            'status' => ReportStatus::WAITING
         ];
         if ($post['lastpage']) {
             $condition['id'] = ['<', $post['lastpage']];
-        }
-        if (!is_null($post['status'])) {
-            $condition['status'] = $post['status'];
         }
 
         if (!$result['list'] = $this->getDb()->field('id,location,address,user_mobile,report_type,status,create_time')->where($condition)->order('id desc')->limit($result['limit'])->select()) {

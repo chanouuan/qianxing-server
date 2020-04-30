@@ -26,6 +26,23 @@ class ReportStatus
          3 => '已结案'
     ];
 
+    /**
+     * 获取状态描述
+     * @return string
+     */
+    public static function remark ($status, $recover_time)
+    {
+        $msg = '';
+        if ($status == self::ACCEPT) {
+            if ($recover_time) {
+                $msg = '内勤';
+            } else {
+                $msg = '外勤';
+            }
+        }
+        return $msg . self::getMessage($status);
+    }
+
     public static function format ($code)
     {
         return isset(self::$message[$code]) ? $code : null;
