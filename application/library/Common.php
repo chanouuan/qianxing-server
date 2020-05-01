@@ -1199,7 +1199,8 @@ function conver_chinese_dollar (float $num)
             $ch_str.=$zh_num[$number[$index]] . $zh_unit[$index];
         }
     }
-    $format_str = trim(preg_replace(['/零{2,}/u', '/零万/', '/零元/', '/零亿/'], ['零', '万', '元', '亿'], $ch_str), '零');
+    $format_str = preg_replace(['/零{2,}/u', '/零万/', '/零元/', '/零亿/'], ['零', '万', '元', '亿'], $ch_str);
+    $format_str = preg_replace('/(^零)|(零$)/', '', $format_str);
     if (preg_match('/(分|角)/', $format_str) === 0) {
         $format_str.='整';
     }

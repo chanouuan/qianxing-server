@@ -55,6 +55,9 @@ class MsgModel extends Crud {
      */
     public function sendUserAcceptSms ($user_phone, $group_id)
     {
+        if (!$user_phone) {
+            return error('用户手机为空');
+        }
         $groupInfo = (new GroupModel())->find(['id' => $group_id], 'name,phone');
         $params = [
             'date' => date('Y年m月d日 H时i分', TIMESTAMP),
@@ -84,6 +87,9 @@ class MsgModel extends Crud {
      */
     public function sendReportPaySms ($user_phone, int $group_id, int $report_id)
     {
+        if (!$user_phone) {
+            return error('用户手机为空');
+        }
         $groupInfo = (new GroupModel())->find(['id' => $group_id], 'name,phone');
         $reportInfo = $this->getDb()->table('qianxing_report_info')->field('full_name,plate_num')->where(['id' => $report_id])->find();
         $params = [
@@ -103,13 +109,13 @@ class MsgModel extends Crud {
      */
     public function sendReportCompleteSms (int $law_id, int $report_id)
     {
+        $reportInfo = $this->getDb()->table('qianxing_report_info')->field('archive_num')->where(['id' => $report_id])->find();
         $userInfo = (new UserModel())->find(['id' => $law_id], 'telephone,group_id');
         $groupInfo = (new GroupModel())->find(['id' => $userInfo['group_id']], 'way_name');
-        $reportInfo = $this->getDb()->table('qianxing_report_info')->field('archive_num')->where(['id' => $report_id])->find();
         $params = [
             'date' => date('Y年m月d日 H时i分', TIMESTAMP),
             'name' => $groupInfo['way_name'],
-            'num' => '[' . date('Y', TIMESTAMP) . ']' . $reportInfo['archive_num']
+            'num' => '[' . date('Y', TIMESTAMP) . ']' . ($reportInfo['archive_num'] ? $reportInfo['archive_num'] : '_')
         ];
         return (new AliSmsHelper())->sendSms('花千树', 'SMS_189016294', $userInfo['telephone'], $params);
     }

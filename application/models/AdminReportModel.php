@@ -39,18 +39,10 @@ class AdminReportModel extends Crud {
             return error('案件未找到');
         }
 
-        // 获取卷宗号
-        $reportInfo = $this->getDb()->table('qianxing_report_info')->field('archive_num')->where(['id' => $post['report_id']])->find();
-
         if (false === $this->getDb()->table('qianxing_report_info')->where(['id' => $post['report_id']])->update([
             'archive_num' => $post['archive_num']
         ])) {
             return error('数据更新失败');
-        }
-
-        // 更新统计
-        if (!$reportInfo['archive_num']) {
-            (new ReportModel())->reportCompleteCall($post['report_id']);
         }
 
         // 删除卷宗文件
@@ -135,7 +127,7 @@ class AdminReportModel extends Crud {
             }
             $list = $this->getDb()
                          ->table('qianxing_report report left join qianxing_report_info info on info.id = report.id')
-                         ->field('report.id,law_id,user_mobile,address,stake_number,pay,cash,total_money,create_time,recover_time,status,full_name,plate_num,archive_num')
+                         ->field('report.id,law_id,user_mobile,address,stake_number,pay,cash,total_money,create_time,is_load,recover_time,status,full_name,plate_num,archive_num')
                          ->where($condition)
                          ->order('report.id desc')
                          ->limit($pagesize['limitstr'])
@@ -189,14 +181,14 @@ class AdminReportModel extends Crud {
     {
         $post['report_id'] = intval($post['report_id']);
 
-        if (!$reportData = $this->find(['id' => $post['report_id'], 'group_id' => $this->userInfo['group_id']], 'id,group_id,location,address,user_id,user_mobile,law_id,colleague_id,stake_number,pay,cash,total_money,status,create_time')) {
+        if (!$reportData = $this->find(['id' => $post['report_id'], 'group_id' => $this->userInfo['group_id']], 'id,group_id,location,address,user_id,user_mobile,law_id,colleague_id,stake_number,pay,cash,total_money,status,create_time,is_load,is_property,recover_time,complete_time')) {
             return error('案件未找到');
         }
 
         $reportData['pay'] = round_dollar($reportData['pay']);
         $reportData['cash'] = round_dollar($reportData['cash']);
         $reportData['total_money'] = round_dollar($reportData['total_money']);
-        $reportData['status_str'] = ReportStatus::getMessage($reportData['status']);
+        $reportData['status_str'] = ReportStatus::remark($reportData['status'], $reportData['recover_time']);
         $reportData['stake_number'] = str_replace(' ', '', $reportData['stake_number']);
 
         $adminModel = new AdminModel();
@@ -234,6 +226,13 @@ class AdminReportModel extends Crud {
         $reportData['car_state'] = CarState::getMessage($reportData['car_state']);
         $reportData['traffic_state'] = TrafficState::getMessage($reportData['traffic_state']);
 
+        if ($reportData['site_photos']) {
+            $reportData['site_photos'] = json_decode($reportData['site_photos'], true);
+            foreach ($reportData['site_photos'] as $k => $v) {
+                $reportData['site_photos'][$k]['src'] = httpurl($v['src']);
+            }
+        }
+
         return success($reportData);
     }
 
@@ -257,8 +256,9 @@ class AdminReportModel extends Crud {
         $post['report_id'] = intval($post['report_id']);
         $post['money'] = intval(floatval($post['money']) * 100);
 
-        if ($post['money'] <= 0) {
-            return error('金额不能为空');
+        // 金额有可能为0,但不能小于0
+        if ($post['money'] < 0) {
+            return error('金额不能小于0');
         }
 
         $condition = [
@@ -284,6 +284,11 @@ class AdminReportModel extends Crud {
             'complete_time' => date('Y-m-d H:i:s', TIMESTAMP)
         ])) {
             return error('更新数据失败');
+        }
+
+        // 更新统计
+        if ($post['money'] === $discost) {
+            (new ReportModel())->reportCompleteCall($post['report_id']);
         }
 
         return success('ok');

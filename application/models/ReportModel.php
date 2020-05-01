@@ -226,9 +226,12 @@ class ReportModel extends Crud {
     public function reportFile (array $post, array $adminCondition = [])
     {
         $post['report_id'] = intval($post['report_id']);
+        $post['archive_num'] = trim_space($post['archive_num'], 0, 20); // 卷宗号
 
         $condition = [
-            'id' => $post['report_id'], 
+            'id' => $post['report_id'],
+            'is_load' => 1, // 已处置完
+            'is_property' => 1, // 有路产损失
             'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]]
         ];
         if (empty($adminCondition)) {
@@ -237,24 +240,33 @@ class ReportModel extends Crud {
             $condition += $adminCondition;
         }
 
-        if (!$reportData = $this->find($condition, 'id,group_id,user_mobile')) {
+        if (!$reportData = $this->find($condition, 'id,group_id,user_mobile,total_money')) {
             return error('案件未找到');
         }
 
-        if (!$this->getDb()->where(['id' => $post['report_id'], 'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]]])->update([
+        if (!$this->getDb()->where(['id' => $reportData['id'], 'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]]])->update([
             'status' => ReportStatus::HANDLED,
             'handle_time' => date('Y-m-d H:i:s', TIMESTAMP),
             'update_time' => date('Y-m-d H:i:s', TIMESTAMP)
         ])) {
             return error('数据保存失败');
         }
+
+        if ($post['archive_num']) {
+            // 填写卷宗号
+            $this->getDb()->table('qianxing_report_info')
+                 ->where(['id' => $reportData['id']])
+                 ->update(['archive_num' => $post['archive_num']]);
+        }
         
         // 删除赔偿通知书
         (new WordModel())->removeDocFile($reportData['id'], 'paynote');
 
         // todo 通知用户
-        (new MsgModel())->sendReportPaySms($reportData['user_mobile'], $reportData['group_id'], $reportData['id']);
-
+        if ($reportData['total_money'] > 0) {
+            (new MsgModel())->sendReportPaySms($reportData['user_mobile'], $reportData['group_id'], $reportData['id']);
+        }
+        
         return success('ok');
     }
 
