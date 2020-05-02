@@ -256,7 +256,7 @@ abstract class ActionPDO {
         if (empty($token)) {
             return false;
         }
-        $this->_G['token'] = explode("\t", authcode(rawurldecode($token), 'DECODE'));
+        $this->_G['token'] = explode("\t", \app\library\DataEncrypt::decode($token));
         list ($user_id, $scode, $client, $data) = $this->_G['token'];
         if (!$user_id || !$scode) {
             return false;
