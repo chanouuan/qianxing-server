@@ -703,7 +703,7 @@ class ReportModel extends Crud {
             $fields = 'addr,full_name,idcard,gender,birthday,plate_num,car_type';
         } else if ($post['data_type'] == 'paper') {
             // 勘验笔录信息
-            $fields = 'check_start_time,check_end_time,event_time,weather,car_type,full_name,plate_num,involved_action,involved_build_project,involved_act,involved_action_type,extra_info,signature_checker,signature_writer,signature_agent,signature_invitee,invitee_mobile,checker_time,agent_time';
+            $fields = 'check_start_time,check_end_time,event_time,weather,car_type,full_name,plate_num,involved_action,involved_build_project,involved_act,involved_action_type,extra_info,signature_checker,signature_writer,signature_agent,signature_invitee,invitee_mobile,checker_time,agent_time,idcard_front,idcard_behind,driver_license_front,driver_license_behind,driving_license_front,driving_license_behind,site_photos';
         }
         
         $reportData += $this->getDb()->field($fields)->table('qianxing_report_info')->where(['id' => $post['report_id']])->limit(1)->find();
@@ -718,6 +718,22 @@ class ReportModel extends Crud {
             // 获取卷宗号
             $reportData['way_name'] = (new GroupModel())->count(['id' => $reportData['group_id']], 'way_name');
             $reportData['stake_number'] = str_replace(' ', '', $reportData['stake_number']);
+            // 勾选证据
+            // 当事人身份证
+            $reportData['data_idcard'] = $reportData['idcard_front'] || $reportData['idcard_behind'];
+            // 驾驶证
+            $reportData['data_driver'] = $reportData['driver_license_front'] || $reportData['driver_license_behind'];
+            // 行驶证
+            $reportData['data_driving'] = $reportData['driving_license_front'] || $reportData['driving_license_behind'];
+            // 现场照片
+            $reportData['site_photos'] = json_decode($reportData['site_photos'], true);
+            foreach ($reportData['site_photos'] as $k => $v) {
+                if ($v['src']) {
+                    $reportData['data_site'] = true;
+                    break;
+                }
+            }
+            unset($reportData['idcard_front'], $reportData['idcard_behind'], $reportData['driver_license_front'], $reportData['driver_license_behind'], $reportData['driving_license_front'], $reportData['driving_license_behind'], $reportData['site_photos']);
         }
 
         if (isset($reportData['idcard_front'])) {

@@ -92,7 +92,7 @@ class WordModel extends Crud {
         if (!$data = $this->getReportData($condition)) {
             return error('数据为空');
         }
-        
+
         if ($data['values'] && array_intersect(array_keys($data['values']), $variables)) {
             $templateProcessor->setValues($data['values']);
         }
@@ -182,6 +182,14 @@ class WordModel extends Crud {
         $reportData += $this->getSplitCheckBox('involved_action', $reportData['involved_action'], ['a', 'b', 'c', 'c1', 'c2', 'c3', 'c4', 'd', 'e']);
         $reportData += $this->getSplitCheckBox('involved_action_type', $reportData['involved_action_type'], ['a', 'b', 'c']);
         $reportData += $this->getSplitCheckBoxIf($reportData);
+        $reportData['involved_name'] = [
+            $reportData['involved_action_type.a'] == $this->checked(true) ? '损坏' : null,
+            $reportData['involved_action_type.b'] == $this->checked(true) ? '污染' : null,
+            $reportData['involved_action_type.c'] == $this->checked(true) ? '占用' : null
+        ];
+        $reportData['involved_name'] = array_filter($reportData['involved_name']);
+        $reportData['involved_name'] = $reportData['involved_name'] ? $reportData['involved_name'] : ['损坏'];
+        $reportData['involved_name'] = implode('、', $reportData['involved_name']);
         unset($reportData['event_time'], $reportData['check_start_time'], $reportData['check_end_time'], $reportData['checker_time'], $reportData['agent_time'], $reportData['involved_action'], $reportData['involved_action_type']);
 
         $reportData['weather'] = Weather::getMessage($reportData['weather']);
@@ -223,6 +231,9 @@ class WordModel extends Crud {
         $reportData['signature_invitee'] = $this->getSplitLocalImage($reportData['signature_invitee']);
         $reportData += $this->getSplitPhoto($reportData['site_photos']);
         unset($reportData['site_photos']);
+
+        // 勾选勘验证据
+        $reportData += $this->checkBoxDataItem($reportData);
         
         // 分离出图片
         $images = [];
@@ -300,6 +311,9 @@ class WordModel extends Crud {
                 'height' => 'auto',
                 'ratio' => false
             ]);
+            if (!isset($result['site_photos_exists']) && $result['site_photos.' . $k]) {
+                $result['site_photos_exists'] = 1;
+            }
         }
         return $result;
     }
@@ -316,28 +330,45 @@ class WordModel extends Crud {
         // return implode('', $result);
     }
 
+    private function checkBoxDataItem ($data)
+    {
+        // 勾选证据
+
+        // 当事人身份证
+        $result['dataitem.idcard'] = $this->checked($data['idcard_front'] || $data['idcard_behind']);
+        // 驾驶证
+        $result['dataitem.driver'] = $this->checked($data['driver_license_front'] || $data['driver_license_behind']);
+        // 行驶证
+        $result['dataitem.driving'] = $this->checked($data['driving_license_front'] || $data['driving_license_behind']);
+        // 现场照片
+        $result['dataitem.site'] = $this->checked($data['site_photos_exists']);
+
+        return $result;
+    }
+
     private function getSplitCheckBoxIf ($data)
     {
+        // 勾选事故发生行为
         return [
-            'involved_action.a.a' => $data['involved_action.a'] == '☑' && $data['involved_action_type.a'] == '☑' ? '☑' : '☐',
-            'involved_action.a.b' => $data['involved_action.a'] == '☑' && $data['involved_action_type.b'] == '☑' ? '☑' : '☐',
-            'involved_action.a.c' => $data['involved_action.a'] == '☑' && $data['involved_action_type.c'] == '☑' ? '☑' : '☐',
+            'involved_action.a.a' => $this->checked($data['involved_action.a'] == $this->checked(true) && $data['involved_action_type.a'] == $this->checked(true)),
+            'involved_action.a.b' => $this->checked($data['involved_action.a'] == $this->checked(true) && $data['involved_action_type.b'] == $this->checked(true)),
+            'involved_action.a.c' => $this->checked($data['involved_action.a'] == $this->checked(true) && $data['involved_action_type.c'] == $this->checked(true)),
 
-            'involved_action.b.a' => $data['involved_action.b'] == '☑' && $data['involved_action_type.a'] == '☑' ? '☑' : '☐',
-            'involved_action.b.b' => $data['involved_action.b'] == '☑' && $data['involved_action_type.b'] == '☑' ? '☑' : '☐',
-            'involved_action.b.c' => $data['involved_action.b'] == '☑' && $data['involved_action_type.c'] == '☑' ? '☑' : '☐',
+            'involved_action.b.a' => $this->checked($data['involved_action.b'] == $this->checked(true) && $data['involved_action_type.a'] == $this->checked(true)),
+            'involved_action.b.b' => $this->checked($data['involved_action.b'] == $this->checked(true) && $data['involved_action_type.b'] == $this->checked(true)),
+            'involved_action.b.c' => $this->checked($data['involved_action.b'] == $this->checked(true) && $data['involved_action_type.c'] == $this->checked(true)),
 
-            'involved_action.c.a' => $data['involved_action.c'] == '☑' && $data['involved_action_type.a'] == '☑' ? '☑' : '☐',
-            'involved_action.c.b' => $data['involved_action.c'] == '☑' && $data['involved_action_type.b'] == '☑' ? '☑' : '☐',
-            'involved_action.c.c' => $data['involved_action.c'] == '☑' && $data['involved_action_type.c'] == '☑' ? '☑' : '☐',
+            'involved_action.c.a' => $this->checked($data['involved_action.c'] == $this->checked(true) && $data['involved_action_type.a'] == $this->checked(true)),
+            'involved_action.c.b' => $this->checked($data['involved_action.c'] == $this->checked(true) && $data['involved_action_type.b'] == $this->checked(true)),
+            'involved_action.c.c' => $this->checked($data['involved_action.c'] == $this->checked(true) && $data['involved_action_type.c'] == $this->checked(true)),
 
-            'involved_action.d.a' => $data['involved_action.d'] == '☑' && $data['involved_action_type.a'] == '☑' ? '☑' : '☐',
-            'involved_action.d.b' => $data['involved_action.d'] == '☑' && $data['involved_action_type.b'] == '☑' ? '☑' : '☐',
-            'involved_action.d.c' => $data['involved_action.d'] == '☑' && $data['involved_action_type.c'] == '☑' ? '☑' : '☐',
+            'involved_action.d.a' => $this->checked($data['involved_action.d'] == $this->checked(true) && $data['involved_action_type.a'] == $this->checked(true)),
+            'involved_action.d.b' => $this->checked($data['involved_action.d'] == $this->checked(true) && $data['involved_action_type.b'] == $this->checked(true)),
+            'involved_action.d.c' => $this->checked($data['involved_action.d'] == $this->checked(true) && $data['involved_action_type.c'] == $this->checked(true)),
 
-            'involved_action.e.a' => $data['involved_action.e'] == '☑' && $data['involved_action_type.a'] == '☑' ? '☑' : '☐',
-            'involved_action.e.b' => $data['involved_action.e'] == '☑' && $data['involved_action_type.b'] == '☑' ? '☑' : '☐',
-            'involved_action.e.c' => $data['involved_action.e'] == '☑' && $data['involved_action_type.c'] == '☑' ? '☑' : '☐'
+            'involved_action.e.a' => $this->checked($data['involved_action.e'] == $this->checked(true) && $data['involved_action_type.a'] == $this->checked(true)),
+            'involved_action.e.b' => $this->checked($data['involved_action.e'] == $this->checked(true) && $data['involved_action_type.b'] == $this->checked(true)),
+            'involved_action.e.c' => $this->checked($data['involved_action.e'] == $this->checked(true) && $data['involved_action_type.c'] == $this->checked(true))
         ];
     }
 
@@ -349,10 +380,15 @@ class WordModel extends Crud {
         $result = [];
         $data = json_decode($data, true);
         foreach ($target as $k => $v) {
-            // ☑ ☐ □
-            $result[$lit . '.' . $v] = $data[$v] ? '☑' : '☐';
+            $result[$lit . '.' . $v] = $this->checked($data[$v]);
         }
         return $result;
+    }
+
+    private function checked ($value)
+    {
+        // ☑ ☐ □
+        return $value ? '☑' : '□';
     }
 
     private function getSplitDate ($lit, $date)
