@@ -889,66 +889,6 @@ function check_car_license($license)
     return false;
 }
 
-/**
- * 生成每次请求的sign
- * @param array $data
- * @return string
- */
-function setSign(array $data)
-{
-    if (!isset($data['time'])) {
-        $data['time'] = MICROTIME;
-    }
-    if (!isset($data['nonce_str'])) {
-        $data['nonce_str'] = str_shuffle('abc0123456789');
-    }
-
-    // 加密秘钥
-    $app_secret = strval(getSysConfig('app_secret'));
-
-    // 去掉签名
-    unset($data['sig']);
-
-    // 按key排序
-    ksort($data);
-    // 拼接参数值与密钥，做md5加密
-    $data['sig'] = md5(implode('', $data) . $app_secret);
-
-    return $data;
-}
-
-/**
- * 检查sign是否正常
- * @param array $data
- * @param $data
- * @return boolen
- */
-function checkSignPass(array $data)
-{
-    // 参数校验
-    if (empty($data)) {
-        return success(null);
-    }
-
-    // 验签
-    $sig = $data['sig'];
-    if (empty($sig) || empty($data['time']) || empty($data['nonce_str'])) {
-        return error(null, \StatusCodes::getMessage(\StatusCodes::SIG_ERROR), \StatusCodes::SIG_ERROR);
-    }
-    $data = setSign($data);
-    if ($sig != $data['sig']) {
-        return error(null, \StatusCodes::getMessage(\StatusCodes::SIG_ERROR), \StatusCodes::SIG_ERROR);
-    }
-
-    // 时间效验
-    $auth_expire_time = getSysConfig('auth_expire_time');
-    if ($auth_expire_time && abs(TIMESTAMP - $data['time']) > $auth_expire_time) {
-        return error(null, \StatusCodes::getMessage(\StatusCodes::SIG_EXPIRE), \StatusCodes::SIG_EXPIRE);
-    }
-
-    return success('OK');
-}
-
 function validate_telephone ($telephone)
 {
     if (empty($telephone)) {

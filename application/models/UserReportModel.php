@@ -82,20 +82,21 @@ class UserReportModel extends Crud {
         if ($law_id) {
             // 待受理
             $result[0] = $this->count(['group_id' => $group_id, 'status' => ReportStatus::WAITING]);
-            $list = $this->getDb()->table('qianxing_report')->field('status,count(*) as count')->where(['law_id' => $law_id])->group('status')->select();
+            $list = $this->getDb()
+                ->table('qianxing_report')
+                ->field('status,count(*) as count')
+                ->where(['law_id' => $law_id, 'status' => ['in(1,2)']])
+                ->group('status')
+                ->select();
             $list = array_column($list, 'count', 'status');
             // 受理中
             $result[1] = intval($list[1]);
             // 已完成
-            $result[2] = intval($list[2]) + intval($list[3]);
+            $result[2] = intval($list[2]);
         }
         if ($user_id) {
-            // 全部案件
-            $list = $this->getDb()->table('qianxing_report')->field('status,count(*) as count')->where(['user_id' => $user_id])->group('status')->select();
-            $list = array_column($list, 'count', 'status');
-            $result[0] = intval($list[2]) + intval($list[3]);
-            // 已完成
-            $result[1] = intval($list[3]);
+            // 暂不显示用户端的案件数量
+            $result = [];
         }
         unset($list);
 
