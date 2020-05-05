@@ -400,6 +400,20 @@ class Miniprogramserver extends ActionPDO {
     }
 
     /**
+     * 搜索路产赔损项目
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":[]
+     * }
+     */
+    public function getPropertyItems ()
+    {
+        return (new \app\models\PropertyModel())->getAllItems();
+    }
+
+    /**
      * 保存勘验笔录
      * @login
      * @return array

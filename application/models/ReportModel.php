@@ -301,29 +301,7 @@ class ReportModel extends Crud {
         }
 
         $items = [];
-
-        // 兼容老版本
-        if ($post['items'] && !$post['new']) {
-            if (!$properties = (new PropertyModel())->select(['id' => ['in', array_column($post['items'], 'property_id')]], 'id,category,unit')) {
-                return error('获取路产项目失败');
-            }
-            $properties = array_column($properties, null, 'id');
-            foreach ($post['items'] as $k => $v) {
-                if (isset($properties[$v['property_id']])) {
-                    $items[] = [
-                        'report_id' => $post['report_id'],
-                        'property_id' => $v['property_id'],
-                        'unit' => $properties[$v['property_id']]['unit'],
-                        'name' => $v['name'],
-                        'price' => $v['price'],
-                        'amount' => $v['amount'],
-                        'total_money' => $v['price'] * $v['amount']
-                    ];
-                }
-            }
-        }
-
-        if ($post['items'] && $post['new']) {
+        if ($post['items']) {
             foreach ($post['items'] as $k => $v) {
                 $items[] = [
                     'report_id' => $post['report_id'],
