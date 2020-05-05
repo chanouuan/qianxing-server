@@ -217,6 +217,12 @@ class AdminReportModel extends Crud {
             $reportData['items'][$k]['total_money'] = round_dollar($v['total_money']);
         }
 
+        // 获取现金收款记录
+        $reportData['cash_log'] = $this->getDb()->table('qianxing_report_cash_log')->field('id,user_name,amount,create_time')->where(['report_id' => $reportData['id']])->select();
+        foreach ($reportData['cash_log'] as $k => $v) {
+            $reportData['cash_log'][$k]['amount'] = round_dollar($v['amount']);
+        }
+
         $reportData += $this->getDb()->table('qianxing_report_info')->where(['id' => $reportData['id']])->limit(1)->find();
         $reportData['gender'] = Gender::getMessage($reportData['gender']);
         $reportData['weather'] = Weather::getMessage($reportData['weather']);
@@ -284,6 +290,18 @@ class AdminReportModel extends Crud {
             'complete_time' => date('Y-m-d H:i:s', TIMESTAMP)
         ])) {
             return error('更新数据失败');
+        }
+
+        if ($post['money'] > 0) {
+            // 收款记录
+            $this->getDb()->table('qianxing_report_cash_log')->insert([
+                'report_id' => $reportData['id'],
+                'group_id' => $this->userInfo['group_id'],
+                'user_id' => $this->userInfo['id'],
+                'user_name' => $this->userInfo['nick_name'],
+                'amount' => $post['money'],
+                'create_time' => date('Y-m-d H:i:s', TIMESTAMP)
+            ]);
         }
 
         // 更新统计
