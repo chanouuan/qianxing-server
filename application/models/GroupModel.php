@@ -124,7 +124,7 @@ class GroupModel extends Crud {
         if ($list) {
             array_multisort($points, SORT_ASC, SORT_NUMERIC, $list);
         }
-        return success($list);
+        return success(array_values($list));
     }
 
 }
