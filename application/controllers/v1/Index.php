@@ -35,7 +35,7 @@ class Index extends ActionPDO {
             'speed' => 10,
             'heading' => intval($_GET['heading']),
             'to' => $_GET['to'],
-            'road_type' => 3,
+            //'road_type' => 3,
             'key' => 'RJABZ-M7ZWS-MVAOZ-6X3DM-27WKO-D4F5G'
         ];
         $data = https_request([

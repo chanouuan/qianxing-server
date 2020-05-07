@@ -931,6 +931,9 @@ class ReportModel extends Crud {
         } else {
             $post['plate_num'] = '';
         }
+        if (!$post['plate_num']) {
+            return error('车牌号不能为空');
+        }
         if ($post['idcard'] && !Idcard::check_id($post['idcard'])) {
             return error('身份证号格式不正确');
         }
