@@ -364,7 +364,8 @@ class ReportModel extends Crud {
     {
         $reportData = $this->find(['user_id' => 0, 'user_mobile' => $telephone], 'id', 'id desc');
         if ($reportData) {
-            return $this->getDb()->table('qianxing_report_info')->field('full_name,idcard,gender')->where(['id' => $reportData['id']])->find();
+            $reportInfo = $this->getDb()->table('qianxing_report_info')->field('full_name,idcard,gender')->where(['id' => $reportData['id']])->find();
+            return array_filter($reportInfo);
         }
         return [];
     }
