@@ -91,12 +91,13 @@ class UserModel extends Crud {
             }
         }
 
-        // 判断该手机号是否管理员
-        $adminInfo = (new AdminModel())->getUserInfo(['telephone' => $post['telephone']]);
         $updateParams = [
             'telephone'   => $post['telephone'],
             'update_time' => date('Y-m-d H:i:s', TIMESTAMP)
         ];
+
+        // 判断该手机号是否管理员
+        $adminInfo = (new AdminModel())->getUserInfo(['telephone' => $post['telephone']]);
         if ($adminInfo) {
             if ($adminInfo['status'] != 1) {
                 return error('该手机号已禁用，请联系管理员。');

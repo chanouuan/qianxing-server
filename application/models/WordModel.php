@@ -157,6 +157,9 @@ class WordModel extends Crud {
 
         $reportData['gender'] = Gender::getMessage($reportData['gender']);      
 
+        // 车辆数
+        $reportData['plate_num_count'] = $reportData['plate_num'] ? count(explode(',', $reportData['plate_num'])) : 0;
+
         // 路产受损赔付清单
         $reportData['items'] = $this->getDb()->field('name,unit,price,amount,total_money')->table('qianxing_report_item')->where(['report_id' => $reportData['id']])->select();
         $reportData['items_content'] = $this->getBRline($reportData['items']);

@@ -364,7 +364,7 @@ class ReportModel extends Crud {
     {
         $reportData = $this->find(['user_id' => 0, 'user_mobile' => $telephone], 'id', 'id desc');
         if ($reportData) {
-            $reportInfo = $this->getDb()->table('qianxing_report_info')->field('full_name,idcard,gender')->where(['id' => $reportData['id']])->find();
+            $reportInfo = $this->getDb()->table('qianxing_report_info')->field('full_name,idcard')->where(['id' => $reportData['id']])->find();
             return array_filter($reportInfo);
         }
         return [];
@@ -713,6 +713,8 @@ class ReportModel extends Crud {
                 }
             }
             unset($reportData['idcard_front'], $reportData['idcard_behind'], $reportData['driver_license_front'], $reportData['driver_license_behind'], $reportData['driving_license_front'], $reportData['driving_license_behind'], $reportData['site_photos']);
+            // 车辆数
+            $reportData['plate_num_count'] = $reportData['plate_num'] ? count(explode(',', $reportData['plate_num'])) : 0;
         }
 
         if (isset($reportData['idcard_front'])) {
@@ -812,7 +814,6 @@ class ReportModel extends Crud {
         $post['check_start_time'] = strtotime($post['check_start_time']);
         $post['check_start_time'] = $post['check_start_time'] ? $post['check_start_time'] : TIMESTAMP;
         $post['is_property'] = $post['is_property'] ? 1 : 0;
-        $post['is_property'] = 1;
 
         if (!$post['location'] || !$post['address']) {
             return error('请定位位置');
@@ -951,7 +952,7 @@ class ReportModel extends Crud {
 
         // 重新关联当事人，当事人通过 user_mobile 才能获取到订单
         $userModel = new UserModel();
-        $userInfo = $userModel->find(['telephone' => $post['telephone']], 'id');
+        $userInfo = $userModel->find(['telephone' => $post['telephone']], 'id,group_id');
 
         if (!$this->getDb()->transaction(function ($db) use ($post, $userInfo) {
             if (false === $this->getDb()->where(['id' => $post['report_id'], 'law_id' => $this->userInfo['id']])->update([
@@ -978,11 +979,14 @@ class ReportModel extends Crud {
 
         if ($userInfo) {
             // 更新当事人账号信息
-            $userModel->updateUserInfo($userInfo['id'], [
-                'full_name' => $post['full_name'],
-                'idcard' => $post['idcard'],
-                'gender' => $post['gender'],
-            ]);
+            $data = [
+                'idcard' => $post['idcard']
+            ];
+            if (!$userInfo['group_id']) {
+                // 不修改路政员的姓名
+                $data['full_name'] = $post['full_name'];
+            }
+            $userModel->updateUserInfo($userInfo['id'], $data);
         }
 
         return success('ok');

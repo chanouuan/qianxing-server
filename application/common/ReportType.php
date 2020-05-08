@@ -10,7 +10,7 @@ class ReportType
 
     static $message = [
         1 => '交通事故',
-        2 => '车辆事故'
+        2 => '车辆故障'
     ];
 
     public static function format ($code)

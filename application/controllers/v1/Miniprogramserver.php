@@ -16,7 +16,7 @@ class Miniprogramserver extends ActionPDO {
             'upload'              => ['interval' => 1000],
             'login'               => ['interval' => 1000],
             'changePhone'         => ['interval' => 1000],
-            'sendSms'             => ['interval' => 1000, 'rule' => '5|10|20'],
+            'sendSms'             => ['interval' => 30000, 'rule' => '2|5|10'],
             'saveUserInfo'        => ['interval' => 200],
             'getDistrictGroup'    => ['interval' => 1000],
             'reportEvent'         => ['interval' => 1000],
