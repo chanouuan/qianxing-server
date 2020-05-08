@@ -1056,7 +1056,7 @@ class ReportModel extends Crud {
     {
         $post['report_id'] = intval($post['report_id']);
 
-        if (!$reportData = $this->getMutiInfo(['id' => $post['report_id']], 'colleague_id')) {
+        if (!$reportData = $this->getMutiInfo(['id' => $post['report_id']], 'law_id,colleague_id')) {
             return error('案件未找到');
         }
 
@@ -1068,7 +1068,7 @@ class ReportModel extends Crud {
         }
 
         // 更新统计数
-        (new UserCountModel())->setReportCount(null, array_filter([$this->userInfo['id'], $reportData['colleague_id']]));
+        (new UserCountModel())->setReportCount(null, array_filter([$reportData['law_id'], $reportData['colleague_id']]));
 
         return success('ok');
     }
