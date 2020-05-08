@@ -8,7 +8,6 @@ class Index extends ActionPDO {
 
     public function _init ()
     {
-        \DebugLog::_debug(false);
         header('Access-Control-Allow-Origin: *'); // 允许任意域名发起的跨域请求
         header('Access-Control-Allow-Headers: X-Requested-With,X_Requested_With');
         if (!isset($_SERVER['PHP_AUTH_USER']) ||
@@ -20,6 +19,11 @@ class Index extends ActionPDO {
             header('WWW-Authenticate: Basic realm="Administrator Secret"');
             exit('Administrator Secret!');
         }
+    }
+
+    public function index () 
+    {
+        die();
     }
 
     public function setmap ()
@@ -100,18 +104,9 @@ class Index extends ActionPDO {
         ]);
     }
 
-    public function index () 
-    {
-        // (new \app\models\MsgModel())->sendReportEventSms(3, [
-        //     'user_mobile' => '13333333333',
-        //     'address' => '测试',
-        //     'report_type' => 1
-        // ]);
-        die();
-    }
-
     public function logger ()
     {
+        \DebugLog::_debug(false);
         $path = trim_space(ltrim($_GET['path'], '/'));
         $path = ltrim(str_replace('.', '', $path), '/');
         $path = $path ? $path : (date('Ym') . '/' . date('Ymd') . '_debug');

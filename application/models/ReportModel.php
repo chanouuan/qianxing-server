@@ -32,6 +32,22 @@ class ReportModel extends Crud {
     }
 
     /**
+     * 验证协同人员，获取案件信息
+     * @return array
+     */
+    private function getMutiInfo (array $condition, $field)
+    {
+        if (!$this->userInfo) {
+            return false;
+        }
+        $condition['group_id'] = $this->userInfo['group_id'];
+        $condition['law_id'] = ['=', $this->userInfo['id'], 'and ('];
+        $condition['colleague_id'] = ['=', $this->userInfo['id'], 'or', ')'];
+        $condition['status'] = $condition['status'] ? $condition['status'] : ['in(' . ReportStatus::ACCEPT . ',' . ReportStatus::HANDLED . ')'];
+        return $this->find($condition, $field);
+    }
+
+    /**
      * 恢复畅通
      * @return array
      */
@@ -41,11 +57,11 @@ class ReportModel extends Crud {
         $post['recover_time'] = $post['recover_time'] && strtotime($post['recover_time']) ? $post['recover_time'] : date('Y-m-d H:i:00', TIMESTAMP);
         
         $condition = [
-            'id' => $post['report_id'], 
-            'law_id' => $this->userInfo['id'], 
-            'recover_time' => null
+            'id' => $post['report_id'],
+            'recover_time' => null,
+            'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED, ReportStatus::COMPLETE]]
         ];
-        if (!$reportData = $this->find($condition, 'is_property')) {
+        if (!$reportData = $this->getMutiInfo($condition, 'is_property')) {
             return error('未找到案件');
         }
 
@@ -92,7 +108,7 @@ class ReportModel extends Crud {
             return error('该移交人不在同部门');
         }
 
-        if (!$reportData = $this->find(['id' => $post['report_id'], 'group_id' => $this->userInfo['group_id'], 'status' => ReportStatus::ACCEPT], 'user_mobile')) {
+        if (!$reportData = $this->find(['id' => $post['report_id'], 'is_load' => 0, 'group_id' => $this->userInfo['group_id'], 'status' => ReportStatus::ACCEPT], 'law_id,user_mobile')) {
             return error('案件信息未找到');
         }
 
@@ -104,7 +120,7 @@ class ReportModel extends Crud {
         }
 
         // 更新统计数
-        (new UserCountModel())->setReportCount($post['target_id'], $this->userInfo['id']);
+        (new UserCountModel())->setReportCount($post['target_id'], $reportData['law_id']);
 
         // todo 通知移交人
         (new MsgModel())->sendReportAcceptSms($targetUser['telephone'], $reportData['user_mobile']);
@@ -175,12 +191,12 @@ class ReportModel extends Crud {
             'patrol_km' => ['patrol_km+' . (new GroupModel())->getDistance($reportData['group_id'], $reportData['location'])]
         ]);
         $userCountModel->updateCityRank([$reportData['law_id'], $reportData['colleague_id']], $reportData['group_id']);
-        $userCountModel->setReportCount(null, $reportData['law_id']);
+        $userCountModel->setReportCount(null, array_filter([$reportData['law_id'], $reportData['colleague_id']]));
 
         // 推送通知给路政
         if ($reportData['is_property']) {
             // 有路产受损
-            (new MsgModel())->sendReportCompleteSms($reportData['law_id'], $reportData['id']);
+            (new MsgModel())->sendReportCompleteSms([$reportData['law_id'], $reportData['colleague_id']], $reportData['id'], $reportData['group_id']);
         }
         
         return true;
@@ -234,9 +250,7 @@ class ReportModel extends Crud {
             'is_property' => 1, // 有路产损失
             'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]]
         ];
-        if (empty($adminCondition)) {
-            $condition['law_id'] = $this->userInfo['id'];
-        } else {
+        if ($adminCondition) {
             $condition += $adminCondition;
         }
 
@@ -284,7 +298,7 @@ class ReportModel extends Crud {
         $post['involved_act'] = trim_space($post['involved_act'], 0, 200);
         $post['extra_info'] = trim_space($post['extra_info'], 0, 200);
 
-        if (!$this->count(['id' => $post['report_id'], 'law_id' => $this->userInfo['id'], 'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]]])) {
+        if (!$this->getMutiInfo(['id' => $post['report_id']], 'id')) {
             return error('案件未找到');
         }
 
@@ -404,7 +418,7 @@ class ReportModel extends Crud {
             return error('保存信息为空');
         }
 
-        if (!$reportData = $this->find(['id' => $post['report_id'], 'law_id' => $this->userInfo['id'], 'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]]], 'is_load')) {
+        if (!$reportData = $this->getMutiInfo(['id' => $post['report_id']], 'is_load')) {
             return error('案件未找到');
         }
 
@@ -517,9 +531,18 @@ class ReportModel extends Crud {
             ]
         ];
 
-        $condition = [
-            $post['islaw'] ? 'law_id' : 'user_id' => $user_id
-        ];
+        if ($post['islaw']) {
+            // 受理人与协同人员都显示
+            $condition = [
+                'group_id' => $post['group_id'],
+                'law_id' => ['=', $user_id, 'and ('],
+                'colleague_id' => ['=', $user_id, 'or', ')'],
+            ];
+        } else {
+            $condition = [
+                'user_id' => $user_id
+            ];
+        }
         if ($post['lastpage']) {
             $condition['id'] = ['<', $post['lastpage']];
         }
@@ -656,7 +679,7 @@ class ReportModel extends Crud {
             return success($reportData);
         }
 
-        if (!$data = $this->find(['id' => $post['report_id']], 'id,group_id,location,address,user_id,user_mobile,law_id,colleague_id,stake_number,total_money,is_property,is_load,status,create_time')) {
+        if (!$data = $this->getMutiInfo(['id' => $post['report_id']], 'id,group_id,location,address,user_id,user_mobile,law_id,colleague_id,stake_number,total_money,is_property,is_load,status,create_time')) {
             return error('案件未找到');
         }
         $reportData = array_merge($reportData, $data);
@@ -772,7 +795,7 @@ class ReportModel extends Crud {
         $post['report_id'] = intval($post['report_id']);
 
         $data = [];
-        $data['invitee_mobile'] = $post['invitee_mobile'];
+        $data['invitee_mobile'] = $post['invitee_mobile']; // 邀请人手机
 
         if ($data['invitee_mobile'] && !validate_telephone($data['invitee_mobile'])) {
             return error('被邀请人手机号格式错误');
@@ -781,7 +804,7 @@ class ReportModel extends Crud {
         $data = array_filter($data);
 
         if ($data) {
-            if (!$this->count(['id' => $post['report_id'], 'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]], 'law_id' => $this->userInfo['id']])) {
+            if (!$this->getMutiInfo(['id' => $post['report_id']], 'id')) {
                 return error('案件未找到');
             }
             if (false === $this->getDb()->table('qianxing_report_info')->where(['id' => $post['report_id']])->update($data)) {
@@ -823,8 +846,21 @@ class ReportModel extends Crud {
         }
 
         if ($post['report_id']) {
-            if (!$this->count(['id' => $post['report_id'], 'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]], 'law_id' => $this->userInfo['id']])) {
+            if (!$reportData = $this->getMutiInfo(['id' => $post['report_id']], 'id,colleague_id')) {
                 return error('案件未找到');
+            }
+            // 当前操作者是受理人还是协同人
+            if ($reportData['colleague_id'] == $this->userInfo['id']) {
+                // 协同人操作不能修改协同人员项
+                $post['colleague_id'] = $this->userInfo['id'];
+            } else {
+                if ($post['colleague_id'] && $post['colleague_id'] == $this->userInfo['id']) {
+                    return error('不能添加自己为协同人员');
+                }
+            }
+        } else {
+            if ($post['colleague_id'] && $post['colleague_id'] == $this->userInfo['id']) {
+                return error('不能添加自己为协同人员');
             }
         }
 
@@ -895,9 +931,25 @@ class ReportModel extends Crud {
             return error('案件保存失败');
         }
 
+        $userCount = new UserCountModel();
         if (!$post['report_id']) {
             // 更新统计数
-            (new UserCountModel())->setReportCount($this->userInfo['id']);
+            $update = [
+                $this->userInfo['id']
+            ];
+            if ($post['colleague_id']) {
+                $update[] = $post['colleague_id'];
+            }
+            $userCount->setReportCount($update);
+        } else {
+            // 更新统计数
+            if ($reportData['colleague_id']) {
+                if ($reportData['colleague_id'] != $post['colleague_id']) {
+                    $userCount->setReportCount($post['colleague_id'], $reportData['colleague_id']);
+                }
+            } else {
+                $userCount->setReportCount($post['colleague_id']);
+            }
         }
 
         // 无路产损失
@@ -950,12 +1002,16 @@ class ReportModel extends Crud {
             return error('手机号格式错误');
         }
 
+        if (!$this->getMutiInfo(['id' => $post['report_id']], 'id')) {
+            return error('案件未找到');
+        }
+
         // 重新关联当事人，当事人通过 user_mobile 才能获取到订单
         $userModel = new UserModel();
         $userInfo = $userModel->find(['telephone' => $post['telephone']], 'id,group_id');
 
         if (!$this->getDb()->transaction(function ($db) use ($post, $userInfo) {
-            if (false === $this->getDb()->where(['id' => $post['report_id'], 'law_id' => $this->userInfo['id']])->update([
+            if (false === $this->getDb()->where(['id' => $post['report_id']])->update([
                 'user_id' => $userInfo ? $userInfo['id'] : 0, // 当事人是否已有账号
                 'user_mobile' => $post['telephone']
             ])) {
@@ -1000,7 +1056,7 @@ class ReportModel extends Crud {
     {
         $post['report_id'] = intval($post['report_id']);
 
-        if (!$reportInfo = $this->find(['id' => $post['report_id'], 'law_id' => $this->userInfo['id'], 'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]]], 'id')) {
+        if (!$reportData = $this->getMutiInfo(['id' => $post['report_id']], 'colleague_id')) {
             return error('案件未找到');
         }
 
@@ -1012,7 +1068,7 @@ class ReportModel extends Crud {
         }
 
         // 更新统计数
-        (new UserCountModel())->setReportCount(null, $this->userInfo['id']);
+        (new UserCountModel())->setReportCount(null, array_filter([$this->userInfo['id'], $reportData['colleague_id']]));
 
         return success('ok');
     }

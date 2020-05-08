@@ -107,17 +107,18 @@ class MsgModel extends Crud {
      * xxxx年xx月xx日 xx时xx分，案件XXXXXXXX(黔遵高路龙坪赔[2020]9号)，已结案。
      * @return array
      */
-    public function sendReportCompleteSms (int $law_id, int $report_id)
+    public function sendReportCompleteSms (array $law_id, int $report_id, int $group_id)
     {
+        $groupInfo = (new GroupModel())->find(['id' => $group_id], 'way_name');
         $reportInfo = $this->getDb()->table('qianxing_report_info')->field('archive_num')->where(['id' => $report_id])->find();
-        $userInfo = (new UserModel())->find(['id' => $law_id], 'telephone,group_id');
-        $groupInfo = (new GroupModel())->find(['id' => $userInfo['group_id']], 'way_name');
+        $userInfo = (new UserModel())->select(['id' => ['in', $law_id]], 'telephone');
+        $userInfo = array_column($userInfo, 'telephone');
         $params = [
             'date' => date('Y年m月d日 H时i分', TIMESTAMP),
             'name' => $groupInfo['way_name'],
             'num' => '[' . date('Y', TIMESTAMP) . ']' . ($reportInfo['archive_num'] ? $reportInfo['archive_num'] : '_')
         ];
-        return (new AliSmsHelper())->sendSms('花千树', 'SMS_189016294', $userInfo['telephone'], $params);
+        return (new AliSmsHelper())->sendSms('花千树', 'SMS_189016294', $userInfo, $params);
     }
 
     /**

@@ -85,7 +85,12 @@ class UserReportModel extends Crud {
             $list = $this->getDb()
                 ->table('qianxing_report')
                 ->field('status,count(*) as count')
-                ->where(['law_id' => $law_id, 'status' => ['in(1,2)']])
+                ->where([
+                    'group_id' => $group_id,
+                    'law_id' => ['=', $law_id, 'and ('],
+                    'colleague_id' => ['=', $law_id, 'or', ')'],
+                    'status' => ['in(1,2)']
+                ])
                 ->group('status')
                 ->select();
             $list = array_column($list, 'count', 'status');
