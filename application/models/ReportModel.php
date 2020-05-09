@@ -122,9 +122,6 @@ class ReportModel extends Crud {
         // 更新统计数
         (new UserCountModel())->setReportCount($post['target_id'], $reportData['law_id']);
 
-        // todo 通知移交人
-        (new MsgModel())->sendReportAcceptSms($targetUser['telephone'], $reportData['user_mobile']);
-
         return success('ok');
     }
 
@@ -193,12 +190,6 @@ class ReportModel extends Crud {
         $userCountModel->updateCityRank([$reportData['law_id'], $reportData['colleague_id']], $reportData['group_id']);
         $userCountModel->setReportCount(null, array_filter([$reportData['law_id'], $reportData['colleague_id']]));
 
-        // 推送通知给路政
-        if ($reportData['is_property']) {
-            // 有路产受损
-            (new MsgModel())->sendReportCompleteSms([$reportData['law_id'], $reportData['colleague_id']], $reportData['id'], $reportData['group_id']);
-        }
-        
         return true;
     }
 
@@ -643,7 +634,6 @@ class ReportModel extends Crud {
 
         // 推送通知
         $msgModel = new MsgModel();
-        $msgModel->sendReportAcceptSms($this->userInfo['telephone'], $userReport['user_mobile']);
         $msgModel->sendUserAcceptSms($userReport['user_mobile'], $this->userInfo['group_id']);
 
         return success(['report_id' => $report_id]);

@@ -9,7 +9,7 @@ class MsgModel extends Crud {
 
     /**
      * 发送报案通知短信
-     * xxxx年xx月xx日 xx时xx分，手机号为xxx的用户在xx地址发生xx事故，请及时联系司机并前往处置。
+     * ${date}，手机号为${phone}的用户在${addr}发生${type}，请及时联系司机并前往处置
      * @return array
      */
     public function sendReportEventSms (int $group_id, array $templete_params)
@@ -42,15 +42,15 @@ class MsgModel extends Crud {
         $params = [
             'date' => date('Y年m月d日 H时i分', TIMESTAMP),
             'phone' => $templete_params['user_mobile'],
-            'address' => $templete_params['address'],
+            'addr' => $templete_params['address'],
             'type' => \app\common\ReportType::getMessage($templete_params['report_type'])
         ];
-        return (new AliSmsHelper())->sendSms('花千树', 'SMS_188556034', $telephone, $params);
+        return (new AliSmsHelper())->sendSms('遵义高速公路管理处', 'SMS_189760235', $telephone, $params);
     }
 
     /**
      * 通知报案人已受理案件
-     * xxxx年xx月xx日 xx时xx分，xxx大队已受理报案。请开启危险报警闪烁灯，夜间还需开启示轮廓灯，请在车后方放置警示牌，人员请撤离防护带以外，等待救援。
+     * ${date}，${group}已受理报案。请开启危险报警闪烁灯，夜间还需开启示轮廓灯，请在车后方（白天150米外，夜间250米外）放置警示牌，人员请撤离到护栏外，等待救援。联系电话：${phone}
      * @return array
      */
     public function sendUserAcceptSms ($user_phone, $group_id)
@@ -61,28 +61,15 @@ class MsgModel extends Crud {
         $groupInfo = (new GroupModel())->find(['id' => $group_id], 'name,phone');
         $params = [
             'date' => date('Y年m月d日 H时i分', TIMESTAMP),
-            'group' => $groupInfo['name']
+            'group' => $groupInfo['name'],
+            'phone' => $groupInfo['phone']
         ];
-        return (new AliSmsHelper())->sendSms('花千树', 'SMS_188990694', $user_phone, $params);
-    }
-
-    /**
-     * 路政人员受理案件
-     * xxxx年xx月xx日 xx时xx分，开始受理手机号为xxx的当事人案件。
-     * @return array
-     */
-    public function sendReportAcceptSms ($user_phone, $param_phone)
-    {
-        $params = [
-            'date' => date('Y年m月d日 H时i分', TIMESTAMP),
-            'phone' => $param_phone
-        ];
-        return (new AliSmsHelper())->sendSms('花千树', 'SMS_188570794', $user_phone, $params);
+        return (new AliSmsHelper())->sendSms('遵义高速公路管理处', 'SMS_189760224', $user_phone, $params);
     }
 
     /**
      * 用户司机接收赔偿通知书短信
-     * xxxx年xx月xx日 xx时xx分，xxx驾驶机动车xxxx发生交通事故，造成高速公路路产损坏，请你在7天内到xxxx执法大队进行处理，详情可以关注微信公众号“平安遵义高速”查看。处理机关:xxxx大队，电话:xxxx
+     * ${date}，${name}驾驶机动车${car}发生交通事故的【赔（补）偿通知书】已发送至微信小程序“黔中行”，请你前往查看并在7天内到${group}进行处理。联系电话：${phone}
      * @return array
      */
     public function sendReportPaySms ($user_phone, int $group_id, int $report_id)
@@ -99,26 +86,7 @@ class MsgModel extends Crud {
             'group' => $groupInfo['name'],
             'phone' => $groupInfo['phone']
         ];
-        return (new AliSmsHelper())->sendSms('花千树', 'SMS_188551111', $user_phone, $params);
-    }
-
-    /**
-     * 案件结案时通知执法人员
-     * xxxx年xx月xx日 xx时xx分，案件XXXXXXXX(黔遵高路龙坪赔[2020]9号)，已结案。
-     * @return array
-     */
-    public function sendReportCompleteSms (array $law_id, int $report_id, int $group_id)
-    {
-        $groupInfo = (new GroupModel())->find(['id' => $group_id], 'way_name');
-        $reportInfo = $this->getDb()->table('qianxing_report_info')->field('archive_num')->where(['id' => $report_id])->find();
-        $userInfo = (new UserModel())->select(['id' => ['in', $law_id]], 'telephone');
-        $userInfo = array_column($userInfo, 'telephone');
-        $params = [
-            'date' => date('Y年m月d日 H时i分', TIMESTAMP),
-            'name' => $groupInfo['way_name'],
-            'num' => '[' . date('Y', TIMESTAMP) . ']' . ($reportInfo['archive_num'] ? $reportInfo['archive_num'] : '_')
-        ];
-        return (new AliSmsHelper())->sendSms('花千树', 'SMS_189016294', $userInfo, $params);
+        return (new AliSmsHelper())->sendSms('遵义高速公路管理处', 'SMS_189760232', $user_phone, $params);
     }
 
     /**
@@ -127,7 +95,7 @@ class MsgModel extends Crud {
      */
     public function sendCode ($phone, $code)
     {
-        return (new AliSmsHelper())->sendSms('花千树', 'SMS_133971610', $phone, ['code' => $code]);
+        return (new AliSmsHelper())->sendSms('遵义高速公路管理处', 'SMS_189760222', $phone, ['code' => $code]);
     }
 
 }
