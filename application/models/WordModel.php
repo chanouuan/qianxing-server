@@ -161,9 +161,8 @@ class WordModel extends Crud {
         $reportData['plate_num_count'] = $reportData['plate_num'] ? count(explode(',', $reportData['plate_num'])) : 0;
 
         // 路产受损赔付清单
-        $reportData['items'] = $this->getDb()->field('name,unit,price,amount,total_money')->table('qianxing_report_item')->where(['report_id' => $reportData['id']])->select();
-        $reportData['items_content'] = $this->getBRline($reportData['items']);
-        unset($reportData['items']);
+        $items = $this->getDb()->field('name,unit,price,amount,total_money')->table('qianxing_report_item')->where(['report_id' => $reportData['id']])->select();
+        $reportData['items_content'] = $this->getBRline($items);
 
         // 获取勘验人和记录人的执法证号
         $lawNums = $adminModel->getLawNumByUser([$reportData['law_id'], $reportData['colleague_id']]);
@@ -249,7 +248,6 @@ class WordModel extends Crud {
 
         $reportData['item_name'] = [];
         // 获取赔付项目
-        $items = $this->getDb()->table('qianxing_report_item')->field('name,unit,price,amount,total_money')->where(['report_id' => $reportData['id']])->select();
         $rows = [];
         if ($items) {
             $items = array_pad($items, 19, []); // 补齐行数
@@ -264,7 +262,6 @@ class WordModel extends Crud {
                     $reportData['item_name'][] = ($k + 1) . '、' . $v['name'] . $v['amount'] . $v['unit'];
                 }
             }
-            unset($items);
         } else {
             $reportData['item.index'] = '';
             $reportData['item.name'] = '';
@@ -274,7 +271,15 @@ class WordModel extends Crud {
             $reportData['item.total_money'] = '';
         }
         $reportData['item_name'] = implode('；', $reportData['item_name']);
+        unset($items);
 
+        // 无内容要打斜杠
+        foreach ($reportData as $k => $v) {
+            if ($v === null || $v === '') {
+                $reportData[$k] = '/';
+            }
+        }
+        
         return [
             'values' => $reportData,
             'images' => $images,
@@ -327,7 +332,7 @@ class WordModel extends Crud {
         foreach ($data as $k => $v) {
             $result[] = ($k + 1) . '. ' . $v['name'] . $v['amount'] . $v['unit'];
         }
-        return implode('；', $result);
+        return implode('；', $result) . '（以下空白）。';
         // $result = mb_str_split($result, 1);
         // $result = array_pad($result, 100, ''); // 填充占位符
         // return implode('', $result);

@@ -237,7 +237,7 @@ class ReportModel extends Crud {
 
         $condition = [
             'id' => $post['report_id'],
-            'is_load' => 1, // 已处置完
+            'is_load' => ['>0'], // 已处置完
             'is_property' => 1, // 有路产损失
             'status' => ['in', [ReportStatus::ACCEPT, ReportStatus::HANDLED]]
         ];
@@ -472,15 +472,22 @@ class ReportModel extends Crud {
         }
 
         // 当签字后就可以认定案件已处置完成
-        if (!$reportData['is_load']) {
-            if (in_array($post['report_field'], [
+        if (in_array($post['report_field'], [
                 'signature_checker',
                 'signature_writer',
                 'signature_agent',
                 'signature_invitee'
             ])) {
+            $signature = 1; // 路政签字
+            if (in_array($post['report_field'], [
+                    'signature_agent',
+                    'signature_invitee'
+                ])) {
+                $signature = 2; // 当事人签字
+            }
+            if (false === strpos(strval($reportData['is_load']), $signature)) {
                 $this->getDb()->where(['id' => $post['report_id']])->update([
-                    'is_load' => 1
+                    'is_load' => intval($reportData['is_load'] . $signature)
                 ]);
             }
         }
@@ -576,6 +583,7 @@ class ReportModel extends Crud {
 
         foreach ($result['list'] as $k => $v) {
             $result['lastpage'] = $v['id'];
+            $result['list'][$k]['load2'] = false !== strpos($v['is_load'], '2') ? 1 : 0; // 当事人是否已签字
             $result['list'][$k]['stake_number'] = str_replace(' ', '', $v['stake_number']);
             $result['list'][$k]['total_money'] = round_dollar($v['total_money']);
             $result['list'][$k]['status_str'] = ReportStatus::remark($v['status'], $v['recover_time']);
