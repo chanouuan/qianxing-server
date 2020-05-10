@@ -478,16 +478,16 @@ class ReportModel extends Crud {
                 'signature_agent',
                 'signature_invitee'
             ])) {
-            $signature = 1; // 路政签字
+            $signature = '1'; // 路政签字
             if (in_array($post['report_field'], [
                     'signature_agent',
                     'signature_invitee'
                 ])) {
-                $signature = 2; // 当事人签字
+                $signature = '2'; // 当事人签字
             }
             if (false === strpos(strval($reportData['is_load']), $signature)) {
                 $this->getDb()->where(['id' => $post['report_id']])->update([
-                    'is_load' => intval($reportData['is_load'] . $signature)
+                    'is_load' => intval(strval($reportData['is_load']) . $signature)
                 ]);
             }
         }
