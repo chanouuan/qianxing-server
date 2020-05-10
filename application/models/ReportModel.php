@@ -299,7 +299,7 @@ class ReportModel extends Crud {
             $post['items'][$k]['name'] = trim_space($v['name'], 0, 50);
             $post['items'][$k]['price'] = intval(floatval($v['price']) * 100); // 转成分
             $post['items'][$k]['amount'] = intval($v['amount']);
-            $post['items'][$k]['unit'] = trim_space($v['unit'], 0, 20);
+            $post['items'][$k]['unit'] = trim_space($v['unit'], 0, 20, '');
             if (!$post['items'][$k]['property_id'] || !$post['items'][$k]['name'] || $post['items'][$k]['price'] < 0 || $post['items'][$k]['amount'] <= 0) {
                 unset($post['items'][$k]);
             }

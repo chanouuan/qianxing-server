@@ -45,7 +45,7 @@ class MsgModel extends Crud {
             'addr' => $templete_params['address'],
             'type' => \app\common\ReportType::getMessage($templete_params['report_type'])
         ];
-        return (new AliSmsHelper())->sendSms('遵义高速公路管理处', 'SMS_189760235', $telephone, $params);
+        return (new AliSmsHelper())->sendSms('遵义高速公路管理处', 'SMS_189761786', $telephone, $params);
     }
 
     /**
