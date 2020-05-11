@@ -385,6 +385,59 @@ class ReportModel extends Crud {
     }
 
     /**
+     * 更新现场图照
+     * @return array
+     */
+    public function saveSitePhoto (array $post) 
+    {
+        $post['report_id'] = intval($post['report_id']);
+        $post['remove'] = $post['remove'] ? 1 : 0;
+        $post['index'] = intval($post['index']);
+        $post['name'] = trim_space($post['name'], 0, 20, '');
+
+        if (!$reportData = $this->getMutiInfo(['id' => $post['report_id']], 'id')) {
+            return error('案件未找到');
+        }
+
+        if (!$reportInfo = $this->getDb()->table('qianxing_report_info')->field('site_photos')->where(['id' => $post['report_id']])->find()) {
+            return error('案件信息未找到');
+        }
+
+        $site_photos = json_decode($reportInfo['site_photos'], true);
+        if (!isset($site_photos[$post['index']])) {
+            return error('现场图照不存在');
+        }
+        if (!$site_photos[$post['index']]['src']) {
+            return error('请先拍照');
+        }
+
+        if ($post['remove']) {
+            // 删除
+            if ($post['index'] <= 4) {
+                return error('不能删除预定图照');
+            }
+            $delFile = APPLICATION_PATH . '/public/' . $site_photos[$post['index']]['src'];
+            unset($site_photos[$post['index']]);
+            $site_photos = array_values($site_photos);
+        } else {
+            // 修改名称
+            $site_photos[$post['index']]['name'] = $post['name'];
+        }
+
+        if (false === $this->getDb()->table('qianxing_report_info')->where(['id' => $post['report_id']])->update([
+            'site_photos' => json_unicode_encode($site_photos)
+        ])) {
+            return error('图片更新失败');
+        }
+
+        if ($delFile) {
+            // 删除图片
+            unlink($delFile);
+        }
+        return success('ok');
+    }
+
+    /**
      * 上传文件
      * @return array
      */
@@ -438,9 +491,10 @@ class ReportModel extends Crud {
         if ($post['report_field'] == 'site_photos') {
             // 现场图照
             $reportInfo['site_photos'] = $reportInfo['site_photos'] ? json_decode($reportInfo['site_photos'], true) : [['src' => ''],['src' => ''],['src' => ''],['src' => ''],['src' => '']];
+            $post['report_field_index'] = isset($reportInfo['site_photos'][$post['report_field_index']]) ? $post['report_field_index'] : count($reportInfo['site_photos']);
             $reportInfo['site_photos'][$post['report_field_index']]['src'] = $uploadfile['thumburl'] ? $uploadfile['thumburl'] : $uploadfile['url'];
             $update = [
-                'site_photos' => json_encode($reportInfo['site_photos'])
+                'site_photos' => json_unicode_encode($reportInfo['site_photos'])
             ];
         } else {
             $update = [

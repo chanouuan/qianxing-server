@@ -31,15 +31,23 @@ class Index extends ActionPDO {
         if (!$_GET['direction']) {
             $this->_render('setmap.html', null, 'default');
         }
+
+        // https://lbs.qq.com/service/webService/webServiceGuide/webServiceRoute
+
         // heading [from辅助参数]在起点位置时的车头方向，
         // 数值型，取值范围0至360（0度代表正北，顺时针一周360度）传入车头方向，
         // 对于车辆所在道路的判断非常重要，直接影响路线计算的效果
+
+        //[road_type] 起点道路类型，可选值：
+        //0 [默认]不考虑起点道路类型
+        //1 在桥上；2 在桥下；3 在主路；4 在辅路；5 在对面；6 桥下主路；7 桥下辅路
         $params = [
             'from' => $_GET['from'],
             'speed' => 10,
             'heading' => intval($_GET['heading']),
             'to' => $_GET['to'],
-            //'road_type' => 3,
+            'road_type' => 3,
+            //'policy' => 'TRIP',
             'key' => 'RJABZ-M7ZWS-MVAOZ-6X3DM-27WKO-D4F5G'
         ];
         $data = https_request([

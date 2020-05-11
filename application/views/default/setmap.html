@@ -32,6 +32,8 @@ body, html{
 <script>
 var select = 'from';
 var polyline = null;
+var begin = null;
+var end = null;
 function getpoint(str){
     select = str
 }
@@ -52,7 +54,11 @@ function driving(){
             var result = {
                 name: name,
                 start: '', 
-                end: '', 
+                end: '',
+                heading: heading,
+                algorithm: 'vertical',
+                distance: 0,
+                district: '',
                 points: []
             };
             document.getElementById('distance').innerHTML = res.data.distance;
@@ -64,8 +70,12 @@ function driving(){
                 path.push(new qq.maps.LatLng(n[1], n[0]))
             });
             polyline.setPath(path);
+            begin.setPosition(path[0]);
+            end.setPosition(path[path.length-1]);
             result.start = result.points[0];
             result.end = result.points[result.points.length-1];
+            result.distance = res.data.distance;
+            result.district = res.data.district;
             document.getElementById('result').value = JSON.stringify(result);
         }
     })
@@ -85,6 +95,16 @@ var init = function() {
         strokeWeight: 5,
         editable:false,
         map: map
+    });
+    begin = new qq.maps.Label({
+        position: null,
+        map: map,
+        content: '起点'
+    });
+    end = new qq.maps.Label({
+        position: null,
+        map: map,
+        content: '终点'
     });
     //绑定单击事件添加参数
     qq.maps.event.addListener(map, 'click', function(event) {

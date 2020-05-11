@@ -85,29 +85,45 @@ class GroupModel extends Crud {
 
         $points = [];
         foreach ($list as $k => $v) {
-            if ($v['route_points']) {
-                $v['route_points'] = json_decode($v['route_points'], true);
-                foreach ($v['route_points'] as $kk => $vv) {
-                    foreach ($vv['points'] as $kkk => $vvv) {
-                        // 获取距离最近
-                        $distance = LocationUtils::getDistance($vvv, $post['location']);
-                        if (isset($points[$v['id']])) {
-                            if ($points[$v['id']] > $distance) {
-                                $points[$v['id']] = $distance;
-                            }
-                        } else {
+            if (!$v['route_points']) {
+                unset($list[$k]);
+                continue;
+            }
+            $routePoints = json_decode($v['route_points'], true);
+            foreach ($routePoints as $kk => $vv) {
+                if (isset($vv['district']) && false === strpos($vv['district'], $post['district'])) {
+                    continue;
+                }
+                foreach ($vv['points'] as $kkk => $vvv) {
+                    // 获取距离最近
+                    $distance = LocationUtils::getDistance($vvv, $post['location']);
+                    if (isset($points[$v['id']])) {
+                        if ($points[$v['id']] > $distance) {
                             $points[$v['id']] = $distance;
+                        } else {
+                            // 距离变大
+                            if ($vv['algorithm'] == 'vertical') {
+                                // 直线算法
+                                if ($distance - $points[$v['id']] > 500) {
+                                    break;
+                                }
+                            }
                         }
-                        if ($points[$v['id']] <= 10) {
-                            break;
-                        }
+                    } else {
+                        $points[$v['id']] = $distance;
                     }
-                    if (isset($points[$v['id']]) && $points[$v['id']] <= 10) {
+                    // 小于 10 米
+                    if ($points[$v['id']] <= 10) {
                         break;
                     }
                 }
-                unset($list[$k]['route_points']);
-            } else {
+                // 小于 10 米
+                if (isset($points[$v['id']]) && $points[$v['id']] <= 10) {
+                    break;
+                }
+            }
+            unset($list[$k]['route_points']);
+            if (!isset($points[$v['id']])) {
                 unset($list[$k]);
             }
         };

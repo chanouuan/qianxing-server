@@ -100,6 +100,21 @@ class Miniprogramserver extends ActionPDO {
     }
 
     /**
+     * 更新现场图照
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":[]
+     * }
+     */
+    public function saveSitePhoto () 
+    {
+        return (new \app\models\ReportModel($this->_G['user']['user_id']))->saveSitePhoto($_POST);
+    }
+
+    /**
      * 小程序登录
      * @param *code 小程序登录凭证
      * @return array
