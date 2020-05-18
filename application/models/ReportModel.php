@@ -904,6 +904,7 @@ class ReportModel extends Crud {
         } else if ($post['data_type'] == 'show') {
             // 展示案件信息
             $reportData += $this->getDb()->field('check_start_time,event_time,weather,event_type,driver_state,car_state,traffic_state,pass_time')->table('qianxing_report_info')->where(['id' => $post['report_id']])->limit(1)->find();
+            $reportData['stake_number'] = str_replace(' ', '', substr($reportData['stake_number'], 1));
             $reportData['weather'] = Weather::getMessage($reportData['weather']);
             $reportData['event_type'] = EventType::getMessage($reportData['event_type']);
             $reportData['driver_state'] = DriverState::getMessage($reportData['driver_state']);
@@ -1008,7 +1009,7 @@ class ReportModel extends Crud {
             return error('请定位位置');
         }
         if (!$post['stake_number'] || strlen($post['stake_number']) < 2) {
-            return error('请输入桩号');
+            return error('请输入定位地点');
         }
 
         if ($post['report_id']) {
