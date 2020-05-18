@@ -81,15 +81,25 @@ class AdminReportModel extends Crud {
 
         // 搜索当事人
         if ($post['user_name']) {
+            $personCondition = [];
             if (preg_match('/^\d+$/', $post['user_name'])) {
                 if (!validate_telephone($post['user_name'])) {
-                    $condition['full_name'] = $post['user_name'];
+                    $personCondition['full_name'] = $post['user_name'];
                 } else {
-                    $condition['user_mobile'] = $post['user_name'];
+                    $personCondition['user_mobile'] = $post['user_name'];
                 }
             } else {
-                $condition['full_name'] = $post['user_name'];
+                $personCondition['full_name'] = $post['user_name'];
             }
+            $persons = $this->getDb()->table('qianxing_report_person')->field('report_id')->where($personCondition)->select();
+            if (!$persons) {
+                return success([
+                    'total_count' => 0,
+                    'page_size' => $post['page_size'],
+                    'list' => []
+                ]);
+            }
+            $condition['id'] = ['in(' . implode(',', array_column($persons, 'report_id')) . ')'];
         }
 
         // 搜索执法人员
@@ -106,7 +116,8 @@ class AdminReportModel extends Crud {
             } else {
                 $userCondition['full_name'] = $post['law_name'];
             }
-            if (!$data = (new UserModel())->find($userCondition, 'id')) {
+            $data = (new UserModel())->find($userCondition, 'id');
+            if (!$data) {
                 return success([
                     'total_count' => 0,
                     'page_size' => $post['page_size'],
@@ -116,33 +127,42 @@ class AdminReportModel extends Crud {
             $condition['law_id'] = $data['id'];
         }
 
-        $count = $this->getDb()
-                      ->table('qianxing_report report left join qianxing_report_info info on info.id = report.id')
-                      ->where($condition)
-                      ->count();
+        $count = $this->count($condition);
         $list  = [];
         if ($count > 0) {
             if (!$post['export']) {
                 $pagesize = getPageParams($post['page'], $count, $post['page_size']);
             }
-            $list = $this->getDb()
-                         ->table('qianxing_report report left join qianxing_report_info info on info.id = report.id')
-                         ->field('report.id,law_id,user_mobile,address,stake_number,pay,cash,total_money,create_time,is_load,recover_time,status,full_name,plate_num,archive_num')
-                         ->where($condition)
-                         ->order('report.id desc')
-                         ->limit($pagesize['limitstr'])
-                         ->select();
+            $list = $this->select($condition, 'id,law_id,address,stake_number,pay,cash,total_money,create_time,is_load,recover_time,status', 'id desc', $pagesize['limitstr']);
             $userNames = (new UserModel())->getUserNames(array_column($list, 'law_id'));
+            $ids = implode(',', array_column($list, 'id'));
+            $infos = $this->getDb()->table('qianxing_report_info')->field('id,archive_num')->where(['id' => ['in(' . $ids . ')']])->select();
+            $infos = array_column($infos, null, 'id');
+            $persons = $this->getDb()->table('qianxing_report_person')->field('report_id,full_name,user_mobile,plate_num')->where(['report_id' => ['in(' . $ids . ')']])->select();
+            $rs = [];
+            foreach ($persons as $k => $v) {
+                $rs[$v['report_id']][] = $v;
+            }
+            $persons = [];
+            foreach ($rs as $k => $v) {
+                $persons[$k]['full_name'] = implode(' ', array_filter(array_column($v, 'full_name')));
+                $persons[$k]['user_mobile'] = implode(' ', array_filter(array_column($v, 'user_mobile')));
+                $persons[$k]['plate_num'] = implode(' ', array_filter(array_column($v, 'plate_num')));
+            }
             foreach ($list as $k => $v) {
                 $list[$k]['pay'] = round_dollar($v['pay']);
                 $list[$k]['cash'] = round_dollar($v['cash']);
                 $list[$k]['total_money'] = round_dollar($v['total_money']);
                 $list[$k]['law_name'] = $userNames[$v['law_id']];
                 $list[$k]['status_str'] = ReportStatus::remark($v['status'], $v['recover_time']);
-                $list[$k]['address'] = $v['stake_number'] ? str_replace(' ', '', $v['stake_number']) : $v['address'];
+                $list[$k]['address'] = $v['stake_number'] ? str_replace(' ', '', substr($v['stake_number'], 1)) : $v['address'];
                 $list[$k]['create_time'] = substr($v['create_time'], 0, 16);
+                $list[$k]['full_name'] = strval($persons[$v['id']]['full_name']);
+                $list[$k]['user_mobile'] = strval($persons[$v['id']]['user_mobile']);
+                $list[$k]['plate_num'] = strval($persons[$v['id']]['plate_num']);
+                $list[$k]['archive_num'] = $infos[$v['id']]['archive_num'];
             }
-            unset($userNames);
+            unset($userNames, $infos, $rs, $persons);
         }
 
         // 导出
@@ -189,7 +209,7 @@ class AdminReportModel extends Crud {
         $reportData['cash'] = round_dollar($reportData['cash']);
         $reportData['total_money'] = round_dollar($reportData['total_money']);
         $reportData['status_str'] = ReportStatus::remark($reportData['status'], $reportData['recover_time']);
-        $reportData['stake_number'] = str_replace(' ', '', $reportData['stake_number']);
+        $reportData['stake_number'] = str_replace(' ', '', substr($reportData['stake_number'], 1));
 
         $adminModel = new AdminModel();
         $userModel = new UserModel();
@@ -223,15 +243,13 @@ class AdminReportModel extends Crud {
             $reportData['cash_log'][$k]['amount'] = round_dollar($v['amount']);
         }
 
+        // 报送信息
         $reportData += $this->getDb()->table('qianxing_report_info')->where(['id' => $reportData['id']])->limit(1)->find();
-        $reportData['gender'] = Gender::getMessage($reportData['gender']);
         $reportData['weather'] = Weather::getMessage($reportData['weather']);
-        $reportData['car_type'] = CarType::getMessage($reportData['car_type']);
         $reportData['event_type'] = EventType::getMessage($reportData['event_type']);
         $reportData['driver_state'] = DriverState::getMessage($reportData['driver_state']);
         $reportData['car_state'] = CarState::getMessage($reportData['car_state']);
         $reportData['traffic_state'] = TrafficState::getMessage($reportData['traffic_state']);
-
         if ($reportData['site_photos']) {
             $reportData['site_photos'] = json_decode($reportData['site_photos'], true);
             foreach ($reportData['site_photos'] as $k => $v) {
@@ -239,11 +257,19 @@ class AdminReportModel extends Crud {
             }
         }
 
+        // 当事人信息
+        $reportData['persons'] = $this->getDb()->table('qianxing_report_person')->field('id,full_name,gender,birthday,addr,idcard,user_mobile,car_type,plate_num,money')->where(['report_id' => $reportData['id']])->order('id')->select();
+        foreach ($reportData['persons'] as $k => $v) {
+            $reportData['persons'][$k]['gender'] = Gender::getMessage($v['gender']);
+            $reportData['persons'][$k]['car_type'] = CarType::getMessage($v['car_type']);
+            $reportData['persons'][$k]['money'] = round_dollar($v['money']);
+        }
+
         return success($reportData);
     }
 
     /**
-     * 转发赔偿通知书
+     * 发送赔偿通知书
      * @return array
      */
     public function reportFile (array $post)

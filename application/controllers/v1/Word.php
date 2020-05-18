@@ -32,12 +32,24 @@ class Word extends ActionPDO {
             'status' => ['>', \app\common\ReportStatus::ACCEPT]
         ];
         if ($this->_G['user']['clienttype'] == 'mp') {
-            $condition['user_id'] = $this->_G['user']['user_id'];
+            // 用户端
+            if (!\app\library\DB::getInstance()->table('qianxing_report_person')->field('id')->where(['report_id' => $condition['id'], 'user_id' => $this->_G['user']['user_id']])->find()) {
+                return error('案件不存在');
+            }
+            $condition = [
+                'report' => $condition,
+                'person' => [
+                    'user_id' => $this->_G['user']['user_id']
+                ]
+            ];
+            // 当事人的赔偿通知书不同
+            $fileName = [$this->_action . $this->_G['user']['user_id'], $this->_action];
         } else {
             $userInfo = (new \app\models\AdminModel())->checkAdminInfo($this->_G['user']['user_id']);
             $condition['group_id'] = $userInfo['group_id'];
+            $fileName = $this->_action;
         }
-        return (new \app\models\WordModel())->createNote($this->_action, $condition, 'pdf');
+        return (new \app\models\WordModel())->createNote($fileName, $condition, 'pdf');
     }
 
     /**

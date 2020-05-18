@@ -68,7 +68,6 @@ class UserModel extends Crud {
             return $result;
         }
         $userInfo['token'] = $result['data']['token'];
-        $userInfo['openid'] = $post['openid'];
 
         return success($userInfo);
     }
@@ -114,8 +113,8 @@ class UserModel extends Crud {
 
         // 获取报案当事人信息
         $reportModel = new ReportModel();
-        if ($reportInfo = $reportModel->getDerelictCase($post['telephone'])) {
-            $updateParams = array_merge($updateParams, $reportInfo);
+        if ($reportData= $reportModel->getDerelictCase($post['telephone'])) {
+            $updateParams = array_merge($updateParams, $reportData);
         }
 
         // 获取该手机号已注册的用户
@@ -160,14 +159,18 @@ class UserModel extends Crud {
      */
     public function saveUserInfo (int $user_id, array $post) 
     {
-        $post['full_name'] = trim_space($post['full_name'], 0, 20);
-        $post['allow_notice'] = $post['allow_notice'] ? 1 : 0;
-
-        if (false === $this->getDb()->where(['id' => $user_id])->update([
-            'full_name' => $post['full_name'],
-            'allow_notice' => $post['allow_notice']
-        ])) {
-            return error('更新数据失败');
+        $data = [];
+        if (isset($post['full_name'])) {
+            $data['full_name'] = trim_space($post['full_name'], 0, 20);
+        }
+        if (isset($post['allow_notice'])) {
+            $data['allow_notice'] = $post['allow_notice'] ? 1 : 0;
+        }
+        
+        if ($data) {
+            if (false === $this->getDb()->where(['id' => $user_id])->update($data)) {
+                return error('更新数据失败');
+            }
         }
 
         return success('ok');

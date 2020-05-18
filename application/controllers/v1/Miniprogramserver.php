@@ -594,4 +594,19 @@ class Miniprogramserver extends ActionPDO {
         return (new \app\models\ReportModel($this->_G['user']['user_id']))->recoverPass($_POST);
     }
 
+    /**
+     * 保存案件当事人
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "data":{}
+     * }
+     */
+    public function saveReportPerson ()
+    {
+        return (new \app\models\ReportModel($this->_G['user']['user_id']))->saveReportPerson($_POST);
+    }
+
 }

@@ -50,7 +50,7 @@ class MsgModel extends Crud {
 
     /**
      * 通知报案人已受理案件
-     * ${date}，${group}已受理报案。请开启危险报警闪烁灯，夜间还需开启示轮廓灯，请在车后方（白天150米外，夜间250米外）放置警示牌，人员请撤离到护栏外，等待救援。联系电话：${phone}
+     * ${date}，${group}已受理报案。请开启危险报警闪光灯，夜间还需开启示廓灯和后位灯，请在车后方150米放置警示牌，人员请撤离到护栏外等安全地带，等待救援。联系电话：${phone}
      * @return array
      */
     public function sendUserAcceptSms ($user_phone, $group_id)
@@ -64,7 +64,7 @@ class MsgModel extends Crud {
             'group' => $groupInfo['name'],
             'phone' => $groupInfo['phone']
         ];
-        return (new AliSmsHelper())->sendSms('遵义高速公路管理处', 'SMS_189760224', $user_phone, $params);
+        return (new AliSmsHelper())->sendSms('遵义高速公路管理处', 'SMS_189825337', $user_phone, $params);
     }
 
     /**
@@ -72,21 +72,27 @@ class MsgModel extends Crud {
      * ${date}，${name}驾驶机动车${car}发生交通事故的【赔（补）偿通知书】已发送至微信小程序“黔中行”，请你前往查看并在7天内到${group}进行处理。联系电话：${phone}
      * @return array
      */
-    public function sendReportPaySms ($user_phone, int $group_id, int $report_id)
+    public function sendReportPaySms (array $persons, int $group_id)
     {
+        $groupInfo = (new GroupModel())->find(['id' => $group_id], 'name,phone');
+        $user_phone = [];
+        $templete_params = [];
+        foreach ($persons as $k => $v) {
+            if ($v['user_mobile']) {
+                $user_phone[] = $v['user_mobile'];
+                $templete_params[] = [
+                    'date' => date('Y年m月d日 H时i分', TIMESTAMP),
+                    'name' => $v['full_name'],
+                    'car' => $v['plate_num'],
+                    'group' => $groupInfo['name'],
+                    'phone' => $groupInfo['phone']
+                ];
+            }
+        }
         if (!$user_phone) {
             return error('用户手机为空');
         }
-        $groupInfo = (new GroupModel())->find(['id' => $group_id], 'name,phone');
-        $reportInfo = $this->getDb()->table('qianxing_report_info')->field('full_name,plate_num')->where(['id' => $report_id])->find();
-        $params = [
-            'date' => date('Y年m月d日 H时i分', TIMESTAMP),
-            'name' => $reportInfo['full_name'],
-            'car' => $reportInfo['plate_num'],
-            'group' => $groupInfo['name'],
-            'phone' => $groupInfo['phone']
-        ];
-        return (new AliSmsHelper())->sendSms('遵义高速公路管理处', 'SMS_189760232', $user_phone, $params);
+        return (new AliSmsHelper())->sendBatchSms('遵义高速公路管理处', 'SMS_189760232', $user_phone, $templete_params);
     }
 
     /**
