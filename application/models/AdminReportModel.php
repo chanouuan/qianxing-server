@@ -265,6 +265,12 @@ class AdminReportModel extends Crud {
             $reportData['persons'][$k]['money'] = round_dollar($v['money']);
         }
 
+        // 附件
+        $reportData['attachment'] = (new AttachmentModel())->select(['report_id' => $reportData['id']], 'id,name,src', 'id');
+        foreach ($reportData['attachment'] as $k => $v) {
+            $reportData['attachment'][$k]['src'] = httpurl($v['src']);
+        }
+        
         return success($reportData);
     }
 

@@ -345,9 +345,9 @@ class ReportModel extends Crud {
         // 检查赔付清单
         foreach ($post['items'] as $k => $v) {
             $post['items'][$k]['property_id'] = intval($v['property_id']);
-            $post['items'][$k]['name'] = trim_space($v['name'], 0, 50);
+            $post['items'][$k]['name'] = trim_space($v['name'], 0, 50, '');
             $post['items'][$k]['price'] = intval(floatval($v['price']) * 100); // 转成分
-            $post['items'][$k]['amount'] = intval($v['amount']);
+            $post['items'][$k]['amount'] = round(floatval($v['amount']), 1); // 保留小数点后 1 位
             $post['items'][$k]['unit'] = trim_space($v['unit'], 0, 20, '');
             if (!$post['items'][$k]['property_id'] || !$post['items'][$k]['name'] || $post['items'][$k]['price'] < 0 || $post['items'][$k]['amount'] <= 0) {
                 unset($post['items'][$k]);
@@ -364,7 +364,7 @@ class ReportModel extends Crud {
                     'name' => $v['name'],
                     'price' => $v['price'],
                     'amount' => $v['amount'],
-                    'total_money' => $v['price'] * $v['amount']
+                    'total_money' => bcmul($v['price'], $v['amount'])
                 ];
             }
         }
@@ -517,7 +517,7 @@ class ReportModel extends Crud {
             return error('上传失败');
         }
 
-        if (!$reportData = $this->getMutiInfo(['id' => $post['report_id']], 'id,is_load')) {
+        if (!$reportData = $this->getMutiInfo(['id' => $post['report_id']], 'id,is_load,colleague_id')) {
             return error('案件未找到');
         }
 
@@ -599,14 +599,24 @@ class ReportModel extends Crud {
             'signature_agent',
             'signature_invitee'
         ])) {
-            $signature = '1'; // 路政签字
             if (in_array($post['report_field'], [
                 'signature_agent',
                 'signature_invitee'
             ])) {
                 $signature = '2'; // 当事人签字
+            } else {
+                $signature = '1'; // 路政签字
+                // 两个执法人员签字完了，才可以进入下一步操作
+                if ($reportData['colleague_id']) {
+                    $reportInfo = $this->getDb()->table('qianxing_report_info')->field('signature_checker,signature_writer')->where(['id' => $post['report_id']])->find();
+                    if ($reportInfo['signature_checker'] && $reportInfo['signature_writer']) {
+                        $signature = '1';
+                    } else {
+                        $signature = '';
+                    }
+                }
             }
-            if (false === strpos(strval($reportData['is_load']), $signature)) {
+            if ($signature && false === strpos(strval($reportData['is_load']), $signature)) {
                 $this->getDb()->where(['id' => $post['report_id']])->update([
                     'is_load' => intval(strval($reportData['is_load']) . $signature)
                 ]);

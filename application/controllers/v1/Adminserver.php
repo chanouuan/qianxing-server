@@ -46,6 +46,8 @@ class Adminserver extends ActionPDO {
                 'reportFile' => 'report',
                 'reportPayCash' => 'report',
                 'createArchive' => 'report',
+                'reportAttachment' => 'report',
+                'rmReportAttachment' => 'report',
                 // 人员管理
                 'getPeopleList' => 'people',
                 'savePeople' => 'people',
@@ -460,6 +462,36 @@ class Adminserver extends ActionPDO {
     public function importCsv ()
     {
         return (new \app\models\ImportModel())->importCsv($this->_G['user']['user_id'], getgpc('type'));
+    }
+
+    /**
+     * 上传案件附件
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "result":[]
+     * }
+     */
+    public function reportAttachment ()
+    {
+        return (new \app\models\AttachmentModel())->reportAttachment($this->_G['user']['user_id'], $_POST);
+    }
+
+    /**
+     * 删除案件附件
+     * @login
+     * @return array
+     * {
+     * "errorcode":0,
+     * "message":"",
+     * "result":[]
+     * }
+     */
+    public function rmReportAttachment ()
+    {
+        return (new \app\models\AttachmentModel())->rmReportAttachment($_POST);
     }
 
 }
