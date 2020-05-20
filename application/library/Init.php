@@ -115,7 +115,7 @@ class Controller {
 
         $className = '\\app\\controllers\\' . $module;
         if (!class_exists($className)) {
-            throw new \Exception('Undefined Module: ' . $module);
+            json(null, 'Undefined Module: ' . strtolower($module));
         }
 
         $referer = new $className();
@@ -538,7 +538,7 @@ class ComposerAutoloader {
             include $classDir;
             return true;
         } else {
-            throw new \Exception('failed to open stream: ' . $class);
+            return false;
         }
     }
 
