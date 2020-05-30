@@ -258,7 +258,7 @@ class AdminReportModel extends Crud {
         }
 
         // 当事人信息
-        $reportData['persons'] = $this->getDb()->table('qianxing_report_person')->field('id,full_name,gender,birthday,addr,idcard,user_mobile,car_type,plate_num,money')->where(['report_id' => $reportData['id']])->order('id')->select();
+        $reportData['persons'] = $this->getDb()->table('qianxing_report_person')->field('id,company_name,legal_name,company_addr,full_name,gender,birthday,addr,idcard,user_mobile,car_type,plate_num,money')->where(['report_id' => $reportData['id']])->order('id')->select();
         foreach ($reportData['persons'] as $k => $v) {
             $reportData['persons'][$k]['gender'] = Gender::getMessage($v['gender']);
             $reportData['persons'][$k]['car_type'] = CarType::getMessage($v['car_type']);

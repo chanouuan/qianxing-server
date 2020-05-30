@@ -238,6 +238,9 @@ class WordModel extends Crud {
         $reportData['idcard'] = $persons[0]['idcard'];
         $reportData['gender'] = $persons[0]['gender'];
         $reportData['birthday'] = $persons[0]['birthday'];
+        $reportData['company_name'] = $persons[0]['company_name'];
+        $reportData['legal_name'] = $persons[0]['legal_name'];
+        $reportData['company_addr'] = $persons[0]['company_addr'];
         $reportData['plate_num'] = $persons[0]['plate_num'];
         $reportData['car_type'] = $persons[0]['car_type'];
         $reportData['idcard_front'] = $persons[0]['idcard_front'];
@@ -249,6 +252,8 @@ class WordModel extends Crud {
         $reportData['signature_agent'] = $persons[0]['signature_agent'];
         $reportData['signature_invitee'] = $persons[0]['signature_invitee'];
         $reportData['invitee_mobile'] = $persons[0]['invitee_mobile'];
+        $reportData['merge_address'] = $reportData['company_addr'] ? $reportData['company_addr'] : $reportData['addr']; // 单位地址或家庭住址
+        $reportData['person_name'] = $reportData['company_name'] ? $reportData['company_name'] : $reportData['full_name']; // 单位名称或公民姓名
 
         // 图片数据
         $reportData['idcard_front'] = $this->getSplitLocalImage($reportData['idcard_front'], ['width' => 600, 'height' => 'auto', 'ratio' => false]);
@@ -358,7 +363,7 @@ class WordModel extends Crud {
         foreach ($data as $k => $v) {
             $result[] = ($k + 1) . '. ' . $v['name'] . $v['amount'] . $v['unit'];
         }
-        return implode('；', $result) . '。';
+        return implode('；', $result);
         // $result = mb_str_split($result, 1);
         // $result = array_pad($result, 100, ''); // 填充占位符
         // return implode('', $result);

@@ -853,7 +853,7 @@ class ReportModel extends Crud {
             $reportData += $this->getDb()->field('check_start_time,event_time,weather,event_type,driver_state,car_state,traffic_state,pass_time')->table('qianxing_report_info')->where(['id' => $post['report_id']])->limit(1)->find();
         } else if ($post['data_type'] == 'card') {
             // 当事人信息
-            $reportData['persons'] = $this->getDb()->field('id,user_mobile,addr,full_name,idcard,gender,birthday,plate_num,car_type')->table('qianxing_report_person')->where(['report_id' => $post['report_id']])->order('id')->select();
+            $reportData['persons'] = $this->getDb()->field('id,user_mobile,addr,full_name,idcard,gender,birthday,company_name,legal_name,company_addr,plate_num,car_type')->table('qianxing_report_person')->where(['report_id' => $post['report_id']])->order('id')->select();
         } else if ($post['data_type'] == 'paper') {
             // 勘验笔录表信息
             $reportData += $this->getDb()->field('check_start_time,check_end_time,event_time,weather,involved_action,involved_build_project,involved_act,involved_action_type,extra_info,signature_checker,signature_writer,checker_time,agent_time,archive_num,site_photos')->table('qianxing_report_info')->where(['id' => $post['report_id']])->limit(1)->find();
@@ -867,7 +867,7 @@ class ReportModel extends Crud {
             // 卷宗号
             $reportData['way_name'] = (new GroupModel())->count(['id' => $reportData['group_id']], 'way_name');
             // 当事人列表
-            $reportData['persons'] = $this->getDb()->field('id,user_mobile,full_name,plate_num,car_type,signature_agent,signature_invitee,invitee_mobile,money,idcard_front,idcard_behind,driver_license_front,driver_license_behind,driving_license_front,driving_license_behind')->table('qianxing_report_person')->where(['report_id' => $post['report_id']])->order('id')->select();
+            $reportData['persons'] = $this->getDb()->field('id,user_mobile,full_name,company_name,plate_num,car_type,signature_agent,signature_invitee,invitee_mobile,money,idcard_front,idcard_behind,driver_license_front,driver_license_behind,driving_license_front,driving_license_behind')->table('qianxing_report_person')->where(['report_id' => $post['report_id']])->order('id')->select();
             // 车辆数
             $reportData['plate_num_count'] = count($reportData['persons']);
             // 勾选证据
@@ -925,7 +925,7 @@ class ReportModel extends Crud {
             $reportData['law_name'] = strval($userNames[$reportData['law_id']]);
             $reportData['colleague_name'] = strval($userNames[$reportData['colleague_id']]);
             // 当事人列表
-            $reportData['persons'] = $this->getDb()->field('id,user_mobile,full_name,addr,plate_num,car_type,idcard,money')->table('qianxing_report_person')->where(['report_id' => $post['report_id']])->order('id')->select();
+            $reportData['persons'] = $this->getDb()->field('id,user_mobile,full_name,addr,company_name,legal_name,company_addr,plate_num,car_type,idcard,money')->table('qianxing_report_person')->where(['report_id' => $post['report_id']])->order('id')->select();
             foreach ($reportData['persons'] as $k => $v) {
                 $reportData['persons'][$k]['car_type'] = CarType::getMessage($v['car_type']);
                 $reportData['persons'][$k]['money'] = round_dollar($v['money']);
@@ -1157,6 +1157,9 @@ class ReportModel extends Crud {
         foreach ($post['data'] as $k => $v) {
             $data[$k]['report_id'] = $post['report_id'];
             $data[$k]['id'] = intval($v['id']);
+            $data[$k]['company_name'] = trim_space($v['company_name'], 0, 20);
+            $data[$k]['legal_name'] = trim_space($v['legal_name'], 0, 20);
+            $data[$k]['company_addr'] = trim_space($v['company_addr'], 0, 50);
             $data[$k]['addr'] = trim_space($v['addr'], 0, 50);
             $data[$k]['full_name'] = trim_space($v['full_name'], 0, 20);
             $data[$k]['car_type'] = CarType::format($v['car_type']);

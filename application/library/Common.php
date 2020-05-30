@@ -1,5 +1,15 @@
 <?php
 
+function generate_word()
+{
+    // Get a random word
+    $nb = rand(3, 10);
+    $w = '';
+    for ($i = 1; $i <= $nb; $i++)
+        $w .= chr(rand(ord('a'), ord('z')));
+    return $w;
+}
+
 function region_number ($num, $min, $min_limit, $max, $max_limit)
 {
     return $num < $min ? $min_limit : ($num > $max ? $max_limit : $num);
