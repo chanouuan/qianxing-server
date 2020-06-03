@@ -67,12 +67,15 @@ class Miniprogramserver extends ActionPDO {
     {
         $result = [];
 
-        if (!$_POST['page'] || $_POST['page'] == 'index') {
+        if ($_POST['page'] == 'index') {
             // banner
-            $result['banner'] = (new \app\models\BannerModel())->getBanner();
+            $bannerModel = new \app\models\BannerModel();
+            $result['banner'] = $bannerModel->getBanner();
+            $result['msg_notice'] = $bannerModel->getMsgNotice();
+            $result['msg_info'] = $bannerModel->getMsgInfo();
         }
         
-        if (!$_POST['page'] || ($_POST['page'] == 'index' && $_POST['view'] == 'law')) {
+        if ($_POST['page'] == 'index' && $_POST['view'] == 'law') {
             // 事故处理数
             $userCount = (new \app\models\UserCountModel())->loadInfo($this->_G['user']['user_id'], 'report_count');
             $result['report_count'] = $userCount['report_count'];
