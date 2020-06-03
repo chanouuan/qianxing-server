@@ -31,8 +31,8 @@ class BannerModel extends Crud {
     {
         $result = [
             'id' => 1,
-            'title' => '关于“安全生产月”，你知道多少？',
-            'url' => 'https://mp.weixin.qq.com/s/q5YEVOTVPcT0pAcDjb6Ruw'
+            'title' => '今天开始，遵义这条高速又要施工了，以下路段和收费站不能通行！',
+            'url' => 'https://mp.weixin.qq.com/s/uplE-rF-D89qe0f-RmfWHQ'
         ];
         return $result;
     }
